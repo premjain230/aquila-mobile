@@ -1,0 +1,57 @@
+name: aquila
+description: "Aquila AI — the AI that helps students think bigger. Mobile companion app sharing the same backend and accounts as the Aquila AI web app."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Firebase — same project (mentora-c6dca) and same accounts as the website
+  firebase_core: ^3.8.0
+  firebase_auth: ^5.3.3
+  cloud_firestore: ^5.5.1
+  google_sign_in: ^6.2.2
+
+  # Persistence & platform
+  shared_preferences: ^2.3.4
+  package_info_plus: ^8.1.2
+  url_launcher: ^6.3.1
+  share_plus: ^10.1.2
+
+  # Networking (streaming SSE for chat)
+  http: ^1.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: Sora
+      fonts:
+        - asset: assets/fonts/Sora.ttf
+          weight: 300
+        - asset: assets/fonts/Sora.ttf
+          weight: 400
+        - asset: assets/fonts/Sora.ttf
+          weight: 500
+        - asset: assets/fonts/Sora.ttf
+          weight: 600
+        - asset: assets/fonts/Sora.ttf
+          weight: 700
+        - asset: assets/fonts/Sora.ttf
+          weight: 800
+    - family: SpaceMono
+      fonts:
+        - asset: assets/fonts/SpaceMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/SpaceMono-Bold.ttf
+          weight: 700
