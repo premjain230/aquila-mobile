@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'app.dart';
-import 'services/firebase_service.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await FirebaseService.instance.initialize();
+  // Firebase bootstrap runs inside the app's boot gate so that any failure
+  // renders a branded error screen with Retry — never a bare grey surface.
   runApp(const AquilaApp());
 }

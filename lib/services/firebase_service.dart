@@ -74,18 +74,24 @@ class FirebaseService {
     _initializing = true;
     try {
       final config = await fetchConfig();
-      _app = await Firebase.initializeApp(
-        name: 'aquila',
-        options: FirebaseOptions(
-          apiKey: config['apiKey']!.toString(),
-          appId: config['appId']!.toString(),
-          messagingSenderId: config['messagingSenderId']?.toString() ?? '',
-          projectId: config['projectId']!.toString(),
-          authDomain: config['authDomain']?.toString(),
-          storageBucket: config['storageBucket']?.toString(),
-          measurementId: config['measurementId']?.toString(),
-        ),
+      final options = FirebaseOptions(
+        apiKey: config['apiKey']?.toString() ?? '',
+        appId: config['appId']?.toString() ?? '',
+        messagingSenderId: config['messagingSenderId']?.toString() ?? '',
+        projectId: config['projectId']?.toString() ?? '',
+        authDomain: config['authDomain']?.toString(),
+        storageBucket: config['storageBucket']?.toString(),
+        measurementId: config['measurementId']?.toString(),
       );
+      // Use the DEFAULT app so FirebaseAuth/FirebaseFirestore `.instance`
+      // singletons bind correctly. A named app breaks every service that
+      // reads FirebaseAuth.instance / FirebaseFirestore.instance.
+      try {
+        _app = await Firebase.initializeApp(options: options);
+      } on StateError {
+        // Already initialized earlier in this process — reuse it.
+        _app = Firebase.app();
+      }
       _initialized = true;
       return _app!;
     } finally {
