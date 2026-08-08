@@ -132,11 +132,13 @@ class _ChatScreenState extends State<ChatScreen> {
         _scrollToBottom();
       }
     } catch (e) {
+      _failCount++;
       if (mounted) {
         setState(() {
           _items.removeLast();
           if (_items.isNotEmpty && _items.last.isUser) {
-            _items.add(_ChatItem.error('Could not reach Aquila. Check your connection.'));
+            _items.add(_ChatItem.error(
+                "Trouble reaching Aquila. Check your connection and tap to retry. ($_failCount)"));
           }
         });
       }

@@ -123,16 +123,43 @@ class ApiClient {
     }
   }
 
-  /// Handles proxies that send raw text chunks vs JSON `{content:...}`.
+  /// Parses a single SSE `data:` payload.
+  ///
+  /// Groq streams chunks of the form
+  /// `{"choices":[{"delta":{"content":"..."}}]}`. Plain `{content:...}` payloads
+  /// (a shortcut used by some proxies) are also supported. Returns `null` for
+  /// anything that doesn't carry content (metadata/metrics frames) so those
+  /// are skipped rather than rendered.
   String? _extractDelta(String payload) {
     if (payload.isEmpty) return null;
+    Object? decoded;
     try {
-      final m = jsonDecode(payload);
-      if (m is Map) {
-        final content = m['content']?.toString();
-        if (content != null && content.isNotEmpty) return content;
+      decoded = jsonDecode(payload);
+    } catch (_) {
+      // Not JSON — take it as a raw text delta.
+      return payload;
+    }
+    if (decoded is! Map) return null;
+
+    // Groq / OpenAI SSE: content is nested under choices[].delta.
+    final choices = decoded['choices'];
+    if (choices is List && choices.isNotEmpty) {
+      final first = choices.first;
+      if (first is Map) {
+        final delta = first['delta'];
+        if (delta is Map) {
+          final content = delta['content']?.toString();
+          if (content != null && content.isNotEmpty) return content;
+        }
+        final text = first['text']?.toString();
+        if (text != null && text.isNotEmpty) return text;
       }
-    } catch (_) {}
-    return payload;
+    }
+
+    // Flat `{content: "..."}` shape.
+    final flat = decoded['content']?.toString();
+    if (flat != null && flat.isNotEmpty) return flat;
+
+    return null;
   }
 }

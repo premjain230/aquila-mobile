@@ -92,9 +92,13 @@ class AquilaTheme {
       surface: bgCard,
     );
 
-    final baseTextTheme = Typography.material2021(platform: TargetPlatform.android)
-        .black
-        .apply(fontFamily: AquilaColors.fontMain);
+    // Use the brightness-correct typography variant: `.black` (light mode) vs
+    // `.white` (dark mode). Hardcoding `.black` rendered black text on dark
+    // backgrounds in dark mode.
+    final baseTextTheme =
+        (dark ? Typography.material2021(platform: TargetPlatform.android).white
+             : Typography.material2021(platform: TargetPlatform.android).black)
+            .apply(fontFamily: AquilaColors.fontMain);
 
     final textTheme = baseTextTheme.copyWith(
       displayLarge: baseTextTheme.displayLarge?.copyWith(
@@ -199,16 +203,16 @@ class AquilaTheme {
         filled: true,
         fillColor: bgInput,
         contentPadding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-        hintStyle: const TextStyle(
+        hintStyle: TextStyle(
           fontFamily: AquilaColors.fontMain,
           fontSize: 14,
-          color: AquilaColors.textMuted,
+          color: textMuted,
         ),
         labelStyle: TextStyle(
           fontFamily: AquilaColors.fontMain,
           fontSize: 13,
           fontWeight: FontWeight.w500,
-          color: AquilaColors.textSecondary,
+          color: textSecondary,
         ),
         floatingLabelStyle: TextStyle(
           fontFamily: AquilaColors.fontMono,
@@ -226,7 +230,7 @@ class AquilaTheme {
         helperStyle: TextStyle(
           fontFamily: AquilaColors.fontMono,
           fontSize: 11,
-          color: AquilaColors.textSecondary,
+          color: textSecondary,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -267,19 +271,19 @@ class AquilaTheme {
           color: textPrimary,
         ),
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: AquilaColors.bgCard,
-        shape: RoundedRectangleBorder(
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: bgCard,
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
       ),
       popupMenuTheme: PopupMenuThemeData(
-        color: AquilaColors.bgCard,
+        color: bgCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: TextStyle(
           fontFamily: AquilaColors.fontMain,
           fontSize: 13,
-          color: AquilaColors.textPrimary,
+          color: textPrimary,
         ),
       ),
       switchTheme: SwitchThemeData(
@@ -301,11 +305,11 @@ class AquilaTheme {
         foregroundColor: AquilaColors.onAccentText,
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: AquilaColors.bgCard,
-        contentTextStyle: const TextStyle(
+        backgroundColor: bgCard,
+        contentTextStyle: TextStyle(
           fontFamily: AquilaColors.fontMain,
           fontSize: 13,
-          color: AquilaColors.textPrimary,
+          color: textPrimary,
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,

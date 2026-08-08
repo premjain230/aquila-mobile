@@ -84,7 +84,7 @@ class _AquilaAppState extends State<AquilaApp> {
     return MaterialApp(
       title: 'Aquila AI',
       debugShowCheckedModeBanner: false,
-      theme: AquilaTheme.dark(),
+      theme: AquilaTheme.light(),
       darkTheme: AquilaTheme.dark(),
       themeMode: _dark ? ThemeMode.dark : ThemeMode.light,
       home: _home(),

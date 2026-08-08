@@ -8,7 +8,7 @@ class ThemeStore {
 
   Future<bool> load() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_key) == 'dark';
+    return prefs.getString(_key) != 'light';
   }
 
   Future<void> save(bool dark) async {
