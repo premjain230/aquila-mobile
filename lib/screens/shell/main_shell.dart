@@ -5,6 +5,7 @@ import '../../theme/aquila_theme.dart';
 import '../../widgets/common.dart';
 import '../analyze/analyze_screen.dart';
 import '../chat/chat_screen.dart';
+import '../chat/memory_screen.dart';
 import '../planner/planner_screen.dart';
 import '../profile/profile_screen.dart';
 import '../quiz/quiz_screen.dart';
@@ -231,6 +232,14 @@ class _MainShellState extends State<MainShell> {
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => ReferralScreen(uid: widget.uid),
+              ),
+            );
+          }),
+          _drawerMenuTile(Icons.bookmark_outline, 'Memory', () {
+            Navigator.of(context).pop();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => MemoryScreen(uid: widget.uid),
               ),
             );
           }),

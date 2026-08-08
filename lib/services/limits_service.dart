@@ -54,13 +54,18 @@ class LimitsService {
 
   /// Returns a [LimitResult] for the given action type and (if allowed) persists
   /// the increment, atomically resetting the day's counters when needed.
+  ///
+  /// [plan] defaults to `null` so the user's *actual* plan is read from
+  /// `users/{uid}` (previously callers hard-coded `'free'`, which incorrectly
+  /// limited Pro subscribers).
   Future<LimitResult> consume(
     String uid, {
     required UsageType type,
-    String plan = 'free',
+    String? plan,
     int amount = 1,
     int bonusChats = 0,
   }) async {
+    final resolvedPlan = plan ?? await _resolvePlan(uid);
     final ref = _db.collection('usage').doc(uid);
     final snap = await ref.get();
     final today = _todayKey();
@@ -78,9 +83,13 @@ class LimitsService {
     }
 
     final current = snap.exists && docDate == today
-        ? UsageInfo.fromDoc(snap, plan: plan)
+        ? UsageInfo.fromDoc(snap, plan: resolvedPlan)
         : UsageInfo(
-            date: today, chatCount: 0, analysisCount: 0, plannerMinutes: 0, plan: plan);
+            date: today,
+            chatCount: 0,
+            analysisCount: 0,
+            plannerMinutes: 0,
+            plan: resolvedPlan);
 
     final limit = current.getLimit(type);
     final used = current.usedOf(type);
@@ -88,7 +97,7 @@ class LimitsService {
     if (effectiveLimit != -1 && used + amount > effectiveLimit) {
       return LimitResult(
         type: type,
-        plan: plan,
+        plan: resolvedPlan,
         used: used,
         limit: limit,
         bonusChats: bonusChats,
@@ -111,10 +120,19 @@ class LimitsService {
     );
     return LimitResult(
       type: type,
-      plan: plan,
+      plan: resolvedPlan,
       used: used + amount,
       limit: limit,
       bonusChats: bonusChats,
     );
+  }
+
+  /// Reads the user's plan from `users/{uid}` (defaults to `free`).
+  Future<String> _resolvePlan(String uid) async {
+    try {
+      final snap = await _db.collection('users').doc(uid).get();
+      if (snap.data()?['plan']?.toString() == 'pro') return 'pro';
+    } catch (_) {}
+    return 'free';
   }
 }

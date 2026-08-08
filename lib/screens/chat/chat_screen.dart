@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_config.dart';
+import '../../models/chat_models.dart';
 import '../../models/usage_models.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat_service.dart';
 import '../../services/limits_service.dart';
+import '../../services/memory_service.dart';
 import '../../theme/aquila_theme.dart';
 import '../../widgets/common.dart';
 import '../../widgets/markdown_renderer.dart';
 import '../shell/main_shell.dart';
+import 'chat_history_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String uid;
@@ -53,11 +56,11 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _input.text.trim();
     if (text.isEmpty || _sending) return;
 
-    // Gate + consume a chat credit (mirrors web checkAndGate).
+    // Gate + consume a chat credit (mirrors web checkAndGate). The plan is
+    // resolved internally so Pro subscribers get unlimited chats.
     final result = await LimitsService.instance.consume(
       widget.uid,
       type: UsageType.chat,
-      plan: 'free',
       bonusChats: _bonusChats,
     );
     if (!mounted) return;
@@ -77,7 +80,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final assistantId = _items.length - 1;
-      _chatId ??= await ChatService.instance.createSession(widget.uid);
+      _chatId ??=
+          await ChatService.instance.createSession(widget.uid, title: _sessionTitle(text));
       await ChatService.instance.saveMessage(widget.uid, _chatId!, 'user', text);
 
       // Build the message payload (mirrors web chat.js).
@@ -147,11 +151,51 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  String _sessionTitle(String firstMessage) {
+    final trimmed = firstMessage.trim();
+    if (trimmed.isEmpty) return 'New Chat';
+    return trimmed.length <= 60 ? trimmed : '${trimmed.substring(0, 60)}…';
+  }
+
   String _errorText(ApiException e) {
     if (e.statusCode == 503) {
       return 'The AI is busy right now (queue full). Please try again in a moment.';
     }
     return '${e.message} — tap again to retry.';
+  }
+
+  /// Opens the chat-history list; resumes the selected conversation.
+  Future<void> _openHistory() async {
+    final session = await Navigator.of(context).push<ChatSession>(
+      MaterialPageRoute(builder: (_) => ChatHistoryScreen(uid: widget.uid)),
+    );
+    if (session == null || !mounted) return;
+    final messages = await ChatService.instance
+        .loadSessionMessages(widget.uid, session.id);
+    if (!mounted) return;
+    setState(() {
+      _chatId = session.id;
+      _items.clear();
+      for (final m in messages) {
+        _items.add(m.isUser ? _ChatItem.user(m.content) : _ChatItem.assistant(m.content));
+      }
+      _streamingFailed = false;
+      _failCount = 0;
+    });
+    _scrollToBottom();
+  }
+
+  /// Saves an assistant reply to Aquila's long-term memory.
+  Future<void> _remember(String text) async {
+    final ok = await MemoryService.instance.add(widget.uid, text);
+    if (!mounted) return;
+    showAquilaSnack(
+      context,
+      ok
+          ? 'Saved to memory — I\'ll remember this.'
+          : 'Could not save to memory. Please try again.',
+      error: !ok,
+    );
   }
 
   Future<void> _newChat() async {
@@ -186,6 +230,11 @@ class _ChatScreenState extends State<ChatScreen> {
         title: const Text('Aquila AI'),
         actions: [
           IconButton(
+            tooltip: 'Chat history',
+            onPressed: _openHistory,
+            icon: const Icon(Icons.history),
+          ),
+          IconButton(
             tooltip: _searchEnabled ? 'Web search: ON' : 'Web search: OFF',
             onPressed: () => setState(() => _searchEnabled = !_searchEnabled),
             icon: Icon(
@@ -209,7 +258,15 @@ class _ChatScreenState extends State<ChatScreen> {
                     controller: _scroll,
                     padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                     itemCount: _items.length,
-                    itemBuilder: (context, i) => _ChatBubble(item: _items[i]),
+                    itemBuilder: (context, i) {
+                      final item = _items[i];
+                      return _ChatBubble(
+                        item: item,
+                        onRemember: item.role == 'assistant'
+                            ? () => _remember(item.text)
+                            : null,
+                      );
+                    },
                   ),
           ),
           if (_streamingFailed) _retryBar(ext),
@@ -360,7 +417,8 @@ class _ChatItem {
 
 class _ChatBubble extends StatelessWidget {
   final _ChatItem item;
-  const _ChatBubble({required this.item});
+  final VoidCallback? onRemember;
+  const _ChatBubble({required this.item, this.onRemember});
 
   @override
   Widget build(BuildContext context) {
@@ -428,9 +486,43 @@ class _ChatBubble extends StatelessWidget {
           borderRadius: BorderRadius.circular(16).copyWith(bottomLeft: const Radius.circular(4)),
           border: Border.all(color: ext.border),
         ),
-        child: item.text.isEmpty
-            ? _typingDots(ext)
-            : const MarkdownRenderer().render(item.text, context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (item.text.isEmpty)
+              _typingDots(ext)
+            else
+              MarkdownRenderer().render(item.text, context),
+            if (onRemember != null && item.text.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: InkWell(
+                  onTap: onRemember,
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.bookmark_add_outlined,
+                            size: 14, color: ext.textSecondary),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Remember this',
+                          style: TextStyle(
+                            fontFamily: AquilaColors.fontMono,
+                            fontSize: 10.5,
+                            letterSpacing: 0.05,
+                            color: ext.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

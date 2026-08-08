@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/app_config.dart';
 import '../models/chat_models.dart';
 import 'api_client.dart';
+import 'memory_service.dart';
 
 /// Web search + chat, mirroring the web `chat.js` flow: system prompt for the
 /// neuroscience-powered learning model, capped history, optional web search,
@@ -173,6 +174,18 @@ The ultimate goal is to help students become independent learners who can reason
       buffer.write('\n\nPrefers explanations as: $preferredStyle.');
     }
 
+    // Long-term memory (shared with the web app). Inject the most recent
+    // entries so Aquila can recall the student's saved facts & preferences
+    // across conversations and devices.
+    final memories = await MemoryService.instance.load(uid);
+    if (memories.isNotEmpty) {
+      buffer.write('\n\nMEMORY (long-term facts the student asked you to remember):');
+      final top = memories.take(8).toList(growable: false);
+      for (var i = 0; i < top.length; i++) {
+        buffer.write('\n${i + 1}. ${top[i].text}');
+      }
+    }
+
     return buffer.toString();
   }
 
@@ -220,10 +233,23 @@ The ultimate goal is to help students become independent learners who can reason
     }).toList();
   }
 
-  Future<String> createSession(String uid) async {
+  /// Loads the full message list of a session (for chat-history resumption).
+  Future<List<ChatMessage>> loadSessionMessages(String uid, String chatId) async {
+    final snap = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .orderBy('ts', descending: false)
+        .get();
+    return snap.docs.map(ChatMessage.fromDoc).toList(growable: false);
+  }
+
+  Future<String> createSession(String uid, {String? title}) async {
     final ref = _db.collection('users').doc(uid).collection('chats').doc();
     await ref.set({
-      'title': 'New Chat',
+      'title': title?.trim().isNotEmpty == true ? title!.trim() : 'New Chat',
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
       'messageCount': 0,
