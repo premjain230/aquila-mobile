@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/update_service.dart';
 import '../../theme/aquila_theme.dart';
 import '../../widgets/common.dart';
+import '../../widgets/update_dialog.dart';
 import '../analyze/analyze_screen.dart';
 import '../chat/chat_screen.dart';
 import '../chat/memory_screen.dart';
@@ -39,27 +40,11 @@ class _MainShellState extends State<MainShell> {
     try {
       final info = await UpdateService.instance.check();
       if (!mounted) return;
-      if (info.requirement == UpdateRequirement.required) {
-        await showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Update required'),
-            content: Text(
-              'A newer version of Aquila is required to keep studying.\n\n'
-              '${info.notes ?? 'Tap below to download the latest version.'}',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => UpdateService.instance
-                    .openDownload(info.downloadUrl),
-                child: const Text('Update now'),
-              ),
-            ],
-          ),
-        );
-      } else if (info.requirement == UpdateRequirement.available) {
-        showAquilaSnack(context, 'A new version is available — update in Settings.');
+      if (info.requirement == UpdateRequirement.required ||
+          info.requirement == UpdateRequirement.available) {
+        // In-app self-update: downloads the new APK and opens the system
+        // installer (falls back to browser when unavailable).
+        await showUpdateDialog(context, info);
       }
     } catch (_) {
       // Silent: offline / endpoint missing is not an error state.

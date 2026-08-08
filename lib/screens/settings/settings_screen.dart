@@ -5,7 +5,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_config.dart';
 import '../../services/auth_service.dart';
 import '../../services/theme_store.dart';
+import '../../services/update_service.dart';
 import '../../theme/aquila_theme.dart';
+import '../../widgets/common.dart';
+import '../../widgets/update_dialog.dart';
 import '../referral/referral_screen.dart';
 import '../subscription/subscription_screen.dart';
 import 'about_screen.dart';
@@ -42,6 +45,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // Rebuild with the new theme mode: simplest is to toggle via root. The
     // theme is keyed off ThemeMode in app.dart, so we persist here and let
     // the app restart pick it up; for a live switch the shell owns a callback.
+  }
+
+  Future<void> _checkUpdate() async {
+    final info = await UpdateService.instance.check();
+    if (!mounted) return;
+    if (info.requirement == UpdateRequirement.available ||
+        info.requirement == UpdateRequirement.required) {
+      await showUpdateDialog(context, info);
+    } else if (mounted) {
+      showAquilaSnack(context, 'You\'re on the latest version.');
+    }
   }
 
   @override
@@ -99,6 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               MaterialPageRoute(builder: (_) => const AboutScreen()),
             );
           }),
+          _tile(ext, Icons.system_update_alt, 'Check for updates', _checkUpdate),
           _tile(ext, Icons.support_agent, 'Support & Community', _openDiscord),
           const SizedBox(height: 24),
           Center(

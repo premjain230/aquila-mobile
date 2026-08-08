@@ -1,7 +1,7 @@
 name: aquila
 description: "Aquila AI — the AI that helps students think bigger. Mobile companion app sharing the same backend and accounts as the Aquila AI web app."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.12.2
@@ -25,6 +25,11 @@ dependencies:
 
   # Networking (streaming SSE for chat)
   http: ^1.2.2
+
+  # In-app updates: locate a writable dir + open the downloaded APK in the
+  # Android system installer
+  path_provider: ^2.1.4
+  open_filex: ^4.5.0
 
 dev_dependencies:
   flutter_test:
