@@ -72,12 +72,12 @@ class _ReferralScreenState extends State<ReferralScreen> {
             ),
             child: Column(
               children: [
-                const Text('YOUR REFERRAL CODE',
+                Text('YOUR REFERRAL CODE',
                     style: TextStyle(
                       fontFamily: AquilaColors.fontMono,
                       fontSize: 10,
                       letterSpacing: 0.5,
-                      color: AquilaColors.textSecondary,
+                      color: ext.textSecondary,
                     )),
                 const SizedBox(height: 10),
                 Text(

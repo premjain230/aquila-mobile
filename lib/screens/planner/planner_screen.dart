@@ -91,13 +91,13 @@ class _PlannerScreenState extends State<PlannerScreen> {
               children: [
                 const AquilaLogo(size: 60),
                 const SizedBox(height: 22),
-                const Text(
+                Text(
                   'Build your study plan',
                   style: TextStyle(
                     fontFamily: AquilaColors.fontMain,
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
-                    color: AquilaColors.textPrimary,
+                    color: ext.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -229,11 +229,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
               children: [
                 Text(
                   '$completed / $total tasks done',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: AquilaColors.fontMain,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: AquilaColors.textPrimary,
+                    color: ext.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 6),

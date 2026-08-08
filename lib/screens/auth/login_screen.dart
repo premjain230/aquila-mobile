@@ -110,14 +110,14 @@ try {
                   children: [
                     const Center(child: AquilaLogo(size: 64)),
                     const SizedBox(height: 22),
-                    const Center(
+Center(
                       child: Text(
                         'Welcome back',
-style: TextStyle(
+                        style: TextStyle(
                           fontFamily: AquilaColors.fontMain,
                           fontSize: 26,
                           fontWeight: FontWeight.w800,
-                          color: AquilaColors.textPrimary,
+                          color: ext.textPrimary,
                         ),
                       ),
                     ),
@@ -198,7 +198,7 @@ style: TextStyle(
                     const SizedBox(height: 14),
                     AquilaOutlineButton(
                       label: 'Continue with Google',
-                      icon: const Icon(Icons.g_mobiledata, color: AquilaColors.textPrimary),
+                      icon: Icon(Icons.g_mobiledata, color: ext.textPrimary),
                       loading: _submitting,
                       onPressed: _google,
                     ),

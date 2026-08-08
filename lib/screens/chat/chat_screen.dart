@@ -228,13 +228,13 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             const AquilaLogo(size: 64),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'What shall we learn today?',
               style: TextStyle(
                 fontFamily: AquilaColors.fontMain,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AquilaColors.textPrimary,
+                color: ext.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
@@ -398,7 +398,7 @@ class _ChatBubble extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 10, right: 48),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: AquilaColors.bgCard,
+            color: ext.bgCard,
             borderRadius: BorderRadius.circular(16).copyWith(bottomLeft: const Radius.circular(4)),
             border: Border.all(color: AquilaColors.accent3.withValues(alpha: 0.5)),
           ),
@@ -449,7 +449,7 @@ class _ChatBubble extends StatelessWidget {
               child: Container(
                 width: 7,
                 height: 7,
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: AquilaColors.textSecondary),
+                decoration: BoxDecoration(shape: BoxShape.circle, color: ext.textSecondary),
               ),
             ),
           ),

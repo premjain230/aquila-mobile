@@ -158,7 +158,6 @@ class _MainShellState extends State<MainShell> {
                       fontFamily: AquilaColors.fontMain,
                       fontSize: 17,
                       fontWeight: FontWeight.w800,
-                      color: AquilaColors.textPrimary,
                     ),
                   ),
                 ),

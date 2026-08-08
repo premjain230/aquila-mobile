@@ -107,13 +107,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ],
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             '₹0 / lifetime',
             style: TextStyle(
               fontFamily: AquilaColors.fontMain,
               fontSize: 20,
               fontWeight: FontWeight.w800,
-              color: AquilaColors.textPrimary,
+              color: ext.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
@@ -163,13 +163,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ],
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Unlock everything',
             style: TextStyle(
               fontFamily: AquilaColors.fontMain,
               fontSize: 20,
               fontWeight: FontWeight.w800,
-              color: AquilaColors.textPrimary,
+              color: ext.textPrimary,
             ),
           ),
           const SizedBox(height: 12),

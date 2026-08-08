@@ -103,14 +103,14 @@ class _SignupScreenState extends State<SignupScreen> {
                     const SizedBox(height: 12),
                     const Center(child: AquilaLogo(size: 56)),
                     const SizedBox(height: 18),
-                    const Center(
+                    Center(
                       child: Text(
                         'Create your account',
                         style: TextStyle(
                           fontFamily: AquilaColors.fontMain,
                           fontSize: 24,
                           fontWeight: FontWeight.w800,
-                          color: AquilaColors.textPrimary,
+                          color: ext.textPrimary,
                         ),
                       ),
                     ),

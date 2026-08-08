@@ -237,13 +237,13 @@ class _Dashboard extends StatelessWidget {
             Icon(Icons.insights, size: 56,
                 color: AquilaColors.accent.withValues(alpha: 0.4)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'No data yet',
               style: TextStyle(
                 fontFamily: AquilaColors.fontMain,
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: AquilaColors.textPrimary,
+                color: ext.textPrimary,
               ),
             ),
             const SizedBox(height: 8),

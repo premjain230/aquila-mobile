@@ -128,11 +128,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               Text(
                 user.displayName.isEmpty ? 'Aquila Learner' : user.displayName,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: AquilaColors.fontMain,
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: AquilaColors.textPrimary,
+                  color: ext.textPrimary,
                 ),
               ),
               const SizedBox(height: 2),

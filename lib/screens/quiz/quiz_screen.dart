@@ -321,12 +321,12 @@ class _QuizScreenState extends State<QuizScreen> {
                   const SizedBox(height: 16),
                   Text(
                     q.question,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: AquilaColors.fontMain,
                       fontSize: 19,
                       height: 1.45,
                       fontWeight: FontWeight.w700,
-                      color: AquilaColors.textPrimary,
+                      color: ext.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 22),

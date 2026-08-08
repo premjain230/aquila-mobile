@@ -105,7 +105,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                       fontFamily: AquilaColors.fontMain,
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
-                      color: AquilaColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 10),

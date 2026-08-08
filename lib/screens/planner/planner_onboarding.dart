@@ -204,11 +204,11 @@ class _PlannerOnboardingScreenState extends State<PlannerOnboardingScreen> {
               children: [
                 Text(
                   _stepNames[_step],
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: AquilaColors.fontMain,
                     fontSize: 26,
                     fontWeight: FontWeight.w800,
-                    color: AquilaColors.textPrimary,
+                    color: ext.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 6),

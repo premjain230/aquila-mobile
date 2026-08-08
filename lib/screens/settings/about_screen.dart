@@ -40,7 +40,6 @@ class AboutScreen extends StatelessWidget {
                 fontFamily: AquilaColors.fontMain,
                 fontSize: 24,
                 fontWeight: FontWeight.w800,
-                color: AquilaColors.textPrimary,
               ),
             ),
           ),
