@@ -37,7 +37,8 @@ class MemoryService {
     try {
       final snap = await _ref(uid).get();
       final items = snap.data()?['items'];
-      if (items is! List) return const [];
+      // Return a GROWABLE list — callers (add/remove) mutate it in place.
+      if (items is! List) return [];
       final out = <MemoryItem>[];
       for (final raw in items) {
         if (raw is! Map) continue;
@@ -54,7 +55,7 @@ class MemoryService {
       }
       return out;
     } catch (_) {
-      return const [];
+      return [];
     }
   }
 
