@@ -130,10 +130,9 @@ class AuthService {
     final refCode = prefs.getString(AppConfig.prefReferred);
     if (refCode == null || refCode.isEmpty) return;
     try {
-      await ApiCaller.post('/api/referral', {
-        'action': 'claim',
-        'referralCode': refCode,
-        'uid': user.uid,
+      await ApiCaller.post('${AppConfig.referralPath}?path=claim', {
+        'code': refCode,
+        'referredUid': user.uid,
       });
     } catch (_) {
       // Referral claim is best-effort; never block sign-up on it.

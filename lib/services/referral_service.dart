@@ -23,7 +23,7 @@ class ReferralService {
     if (token == null) return null;
     try {
       final resp = await http.get(
-        Uri.parse('${AppConfig.api(AppConfig.referralPath)}?action=dashboard'),
+        Uri.parse('${AppConfig.api(AppConfig.referralPath)}?path=dashboard'),
         headers: {'Authorization': 'Bearer $token'},
       );
       if (resp.statusCode >= 400) return null;

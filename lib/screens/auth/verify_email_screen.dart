@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/aquila_theme.dart';
 import '../../widgets/common.dart';
+import '../shell/main_shell.dart';
 
 /// Mirrors the web verify-email page: waits for the user to confirm the link,
 /// with resend + refresh actions.
@@ -47,7 +48,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       if (widget.user.emailVerified && mounted) {
         _timer?.cancel();
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const _VerifiedLanding()),
+          MaterialPageRoute(
+            builder: (_) => MainShell(uid: widget.user.uid),
+          ),
           (route) => false,
         );
       }
@@ -156,15 +159,5 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         ),
       ),
     );
-  }
-}
-
-/// Re-uses the auth gate: once verified, the gate stream will swap this out.
-class _VerifiedLanding extends StatelessWidget {
-  const _VerifiedLanding();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox.shrink();
   }
 }

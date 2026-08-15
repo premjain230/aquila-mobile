@@ -32,6 +32,7 @@ class _ChatScreenState extends State<ChatScreen> {
   int _bonusChats = 0;
   bool _streamingFailed = false;
   int _failCount = 0;
+  String _lastUserText = '';
 
   @override
   void initState() {
@@ -55,6 +56,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _send() async {
     final text = _input.text.trim();
     if (text.isEmpty || _sending) return;
+    _lastUserText = text;
 
     // Gate + consume a chat credit (mirrors web checkAndGate). The plan is
     // resolved internally so Pro subscribers get unlimited chats.
@@ -108,6 +110,7 @@ class _ChatScreenState extends State<ChatScreen> {
           'temperature': 0.7,
           'stream': true,
         },
+        auth: true,
       )) {
         full += delta;
         if (!mounted) return;
@@ -120,7 +123,10 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       final finalText = full.trim();
       if (finalText.isEmpty) {
-        setState(() => _streamingFailed = true);
+        setState(() {
+          _streamingFailed = true;
+          _items[assistantId] = _ChatItem.assistant(finalText);
+        });
       } else {
         await ChatService.instance.saveMessage(widget.uid, _chatId!, 'assistant', finalText);
       }
@@ -348,7 +354,14 @@ class _ChatScreenState extends State<ChatScreen> {
               style: TextStyle(fontFamily: AquilaColors.fontMain, fontSize: 12.5, color: ext.textSecondary),
             ),
           ),
-          TextButton(onPressed: _send, child: const Text('Retry')),
+          TextButton(
+            onPressed: () {
+              if (_lastUserText.isEmpty) return;
+              _input.text = _lastUserText;
+              _send();
+            },
+            child: const Text('Retry'),
+          ),
         ],
       ),
     );

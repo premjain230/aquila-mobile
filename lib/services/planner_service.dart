@@ -23,6 +23,8 @@ class PlannerService {
     List weeksRaw;
     if (raw is List) {
       weeksRaw = raw;
+    } else if (raw is Map && raw['weeklyPlan'] is List) {
+      weeksRaw = raw['weeklyPlan'] as List;
     } else if (raw is Map && raw['weeks'] is List) {
       weeksRaw = raw['weeks'] as List;
     } else {
