@@ -24,7 +24,7 @@ class AppConfig {
   static const String firebaseConfigPath = '/api/firebase-config';
 
   /// Chat model used by the web app (server-side Groq model).
-  static const String chatModel = 'llama-3.3-70b-versatile';
+  static const String chatModel = 'llama-3.1-8b-instant';
 
   /// Max conversation turns the web app keeps in context.
   static const int maxHistory = 60;
