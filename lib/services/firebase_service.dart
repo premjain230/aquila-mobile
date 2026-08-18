@@ -42,11 +42,23 @@ class FirebaseService {
 
   Future<Map<String, dynamic>> fetchConfig({bool force = false}) async {
     if (AppConfig.apiBase.isEmpty) return const {};
+    // Prefer the live backend config so the app always uses the same Firebase
+    // project the backend verifies ID tokens against. A stale cached config
+    // (different project) would mint tokens the server rejects with 401.
     if (!force) {
       try {
-        final cached = await _loadCached();
-        if (_valid(cached)) return cached;
-      } catch (_) {}
+        final config =
+            await ApiClient.instance.getJson(AppConfig.firebaseConfigPath);
+        if (_valid(config)) {
+          await _saveCache(config);
+          return config;
+        }
+      } catch (_) {
+        // Backend unreachable — fall through to the cached config below.
+      }
+      final cached = await _loadCached();
+      if (_valid(cached)) return cached;
+      throw const ApiException('Could not reach the Aquila backend');
     }
     try {
       final config = await ApiClient.instance.getJson(AppConfig.firebaseConfigPath);
@@ -66,14 +78,30 @@ class FirebaseService {
   Future<FirebaseApp> initialize() async {
     if (_initialized && _app != null) return _app!;
     if (_initializing) {
-      while (_initializing) {
+      // Wait for the in-flight init with a bounded timeout so a stalled first
+      // init never hangs callers indefinitely.
+      var waited = 0;
+      while (_initializing && waited < 10000) {
         await Future<void>.delayed(const Duration(milliseconds: 50));
+        waited += 50;
       }
-      return _app!;
+      if (_initialized && _app != null) return _app!;
+      // Fall through and retry init if the waiter timed out.
     }
     _initializing = true;
     try {
       final config = await fetchConfig();
+      // If the backend now points at a different Firebase project, discard the
+      // old app so tokens are minted against the correct project.
+      final existing = _app;
+      if (existing != null &&
+          existing.options.projectId != config['projectId']?.toString()) {
+        try {
+          await existing.delete();
+        } catch (_) {}
+        _app = null;
+        _initialized = false;
+      }
       final options = FirebaseOptions(
         apiKey: config['apiKey']?.toString() ?? '',
         appId: config['appId']?.toString() ?? '',
@@ -93,6 +121,9 @@ class FirebaseService {
         _app = Firebase.app();
       }
       _initialized = true;
+      if (_app == null) {
+        throw ApiException('Firebase could not be initialized');
+      }
       return _app!;
     } finally {
       _initializing = false;

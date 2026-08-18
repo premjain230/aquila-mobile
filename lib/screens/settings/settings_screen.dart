@@ -125,7 +125,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 8),
           Center(
             child: TextButton(
-              onPressed: () => AuthService.instance.signOut(),
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                await AuthService.instance.signOut();
+                // Pop back to the root so the auth gate re-renders cleanly
+                // and no stale (now logged-out) screen stays on the stack.
+                navigator.popUntil((route) => route.isFirst);
+              },
               child: const Text(
                 'Sign out',
                 style: TextStyle(color: AquilaColors.accent3),

@@ -132,6 +132,17 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } on ApiException catch (e) {
       _failCount++;
+      if (e.statusCode == 401) {
+        // Session is genuinely invalid even after a forced token refresh.
+        await AuthService.instance.signOut();
+        if (!mounted) return;
+        showAquilaSnack(
+          context,
+          'Your session expired. Please sign in again.',
+          error: true,
+        );
+        return;
+      }
       if (mounted) {
         setState(() {
           _items.removeLast();
@@ -164,6 +175,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   String _errorText(ApiException e) {
+    if (e.statusCode == 401) {
+      return 'Your session expired. Please sign in again.';
+    }
     if (e.statusCode == 503) {
       return 'The AI is busy right now (queue full). Please try again in a moment.';
     }

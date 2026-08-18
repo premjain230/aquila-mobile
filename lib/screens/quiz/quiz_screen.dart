@@ -241,6 +241,7 @@ class _QuizScreenState extends State<QuizScreen> {
           'temperature': 0.8,
           'stream': true,
         },
+        auth: true,
       )) {
         acc += delta;
       }

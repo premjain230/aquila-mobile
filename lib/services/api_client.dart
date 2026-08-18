@@ -27,16 +27,53 @@ class ApiClient {
   final http.Client _client = http.Client();
   static const _timeout = Duration(seconds: 90);
 
-  Future<Map<String, String>> _headers({bool auth = false}) async {
+  /// Obtains a fresh Firebase ID token. When `force` is true the SDK is told to
+  /// ignore its cached token and mint a new one (used to recover from a 401).
+  Future<String?> _idToken({bool force = false}) async {
+    try {
+      final user = fa.FirebaseAuth.instance.currentUser;
+      if (user == null) return null;
+      return await user.getIdToken(force);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Builds request headers. For authenticated requests a valid Firebase ID
+  /// token is REQUIRED: if none can be obtained the request throws a 401
+  /// ApiException instead of silently going out without credentials (which is
+  /// what caused an authenticated user to be told "Not authenticated").
+  Future<Map<String, String>> _headers({bool auth = false, bool forceToken = false}) async {
     final h = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
     if (auth) {
-      final idToken = await fa.FirebaseAuth.instance.currentUser?.getIdToken();
-      if (idToken != null) h['Authorization'] = 'Bearer $idToken';
+      final idToken = await _idToken(force: forceToken);
+      if (idToken == null) {
+        throw const ApiException('Your session expired. Please sign in again.',
+            statusCode: 401);
+      }
+      h['Authorization'] = 'Bearer $idToken';
     }
     return h;
+  }
+
+  /// Sends an authenticated request, retrying exactly once with a freshly
+  /// minted token when the server reports an expired/invalid session. This
+  /// guarantees a legitimately signed-in user is never told they're
+  /// unauthenticated just because their token expired mid-conversation.
+  Future<http.Response> _sendWithRetry(
+    Future<http.Response> Function(Map<String, String> headers) send, {
+    required bool auth,
+  }) async {
+    var headers = await _headers(auth: auth);
+    var resp = await send(headers);
+    if (auth && resp.statusCode == 401) {
+      headers = await _headers(auth: auth, forceToken: true);
+      resp = await send(headers);
+    }
+    return resp;
   }
 
   Future<Map<String, dynamic>> postJson(
@@ -44,13 +81,16 @@ class ApiClient {
     Map<String, dynamic> body, {
     bool auth = false,
   }) async {
-    final resp = await _client
-        .post(
-          Uri.parse(AppConfig.api(path)),
-          headers: await _headers(auth: auth),
-          body: jsonEncode(body),
-        )
-        .timeout(_timeout);
+    final resp = await _sendWithRetry(
+      (headers) => _client
+          .post(
+            Uri.parse(AppConfig.api(path)),
+            headers: headers,
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout),
+      auth: auth,
+    );
     if (resp.statusCode >= 400) {
       throw ApiException(_decodeError(resp), statusCode: resp.statusCode);
     }
@@ -63,9 +103,10 @@ class ApiClient {
     if (query != null && query.isNotEmpty) {
       uri = uri.replace(queryParameters: query);
     }
-    final resp = await _client
-        .get(uri, headers: await _headers(auth: auth))
-        .timeout(_timeout);
+    final resp = await _sendWithRetry(
+      (headers) => _client.get(uri, headers: headers).timeout(_timeout),
+      auth: auth,
+    );
     if (resp.statusCode >= 400) {
       throw ApiException(_decodeError(resp), statusCode: resp.statusCode);
     }
@@ -90,13 +131,13 @@ class ApiClient {
     Map<String, dynamic> body, {
     bool auth = false,
   }) async* {
-    final request = http.Request('POST', Uri.parse(AppConfig.api(path)))
-      ..headers.addAll(await _headers(auth: auth))
-      ..body = jsonEncode(body);
-    // Ask the proxy for a streaming response.
-    request.headers['Accept'] = 'text/event-stream';
-
-    final response = await _client.send(request).timeout(_timeout);
+    http.StreamedResponse? response = await _openStream(path, body, auth: auth);
+    // If the session expired, force a token refresh and retry exactly once.
+    if (auth && response.statusCode == 401) {
+      await response.stream.drain();
+      await _idToken(force: true);
+      response = await _openStream(path, body, auth: auth);
+    }
     if (response.statusCode >= 400) {
       final raw = await response.stream.bytesToString();
       throw ApiException(raw, statusCode: response.statusCode);
@@ -121,6 +162,18 @@ class ApiClient {
         idx = buffer.indexOf('\n');
       }
     }
+  }
+
+  Future<http.StreamedResponse> _openStream(
+    String path,
+    Map<String, dynamic> body, {
+    bool auth = false,
+  }) async {
+    final request = http.Request('POST', Uri.parse(AppConfig.api(path)))
+      ..headers.addAll(await _headers(auth: auth))
+      ..body = jsonEncode(body);
+    request.headers['Accept'] = 'text/event-stream';
+    return _client.send(request).timeout(_timeout);
   }
 
   /// Parses a single SSE `data:` payload.
