@@ -178,6 +178,9 @@ class _ChatScreenState extends State<ChatScreen> {
     if (e.statusCode == 401) {
       return 'Your session expired. Please sign in again.';
     }
+    if (e.statusCode == 429) {
+      return 'Daily chat limit reached — upgrade to Aquila Pro for unlimited chats.';
+    }
     if (e.statusCode == 503) {
       return 'The AI is busy right now (queue full). Please try again in a moment.';
     }

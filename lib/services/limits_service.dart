@@ -19,13 +19,6 @@ class LimitsService {
     final ref = _db.collection('usage').doc(uid);
     final snap = await ref.get();
     if (!snap.exists) {
-      await ref.set({
-        'date': _todayKey(),
-        'dailyChatCount': 0,
-        'dailyAnalysisCount': 0,
-        'plannerUsageMinutes': 0,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
       return UsageInfo(
         date: _todayKey(),
         chatCount: 0,
@@ -52,8 +45,13 @@ class LimitsService {
     });
   }
 
-  /// Returns a [LimitResult] for the given action type and (if allowed) persists
-  /// the increment, atomically resetting the day's counters when needed.
+  /// Returns a [LimitResult] for the given action type WITHOUT writing usage.
+  ///
+  /// Usage counters are owned by the server: `firestore.rules` deny client
+  /// writes to `usage/{uid}` and `/api/groq-proxy` enforces + increments them
+  /// via the Admin SDK (mirrors the web `checkAndGate`/`incrementUsage` no-op).
+  /// Writing here previously threw a permission error before the caller's
+  /// try block, which silently blocked sending chat messages.
   ///
   /// [plan] defaults to `null` so the user's *actual* plan is read from
   /// `users/{uid}` (previously callers hard-coded `'free'`, which incorrectly
@@ -71,17 +69,8 @@ class LimitsService {
     final today = _todayKey();
     final docDate = snap.data()?['date']?.toString() ?? '';
 
-    // Reset counters when the day rolled over.
-    if (snap.exists && docDate != today) {
-      await ref.set({
-        'date': today,
-        'dailyChatCount': 0,
-        'dailyAnalysisCount': 0,
-        'plannerUsageMinutes': 0,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    }
-
+    // Server rolls the counter over when the date changes; surface zeros for a
+    // stale/missing doc (mirrors web ensureUsageDoc).
     final current = snap.exists && docDate == today
         ? UsageInfo.fromDoc(snap, plan: resolvedPlan)
         : UsageInfo(
@@ -104,20 +93,8 @@ class LimitsService {
       );
     }
 
-    // Allow — persist the increment.
-    final field = switch (type) {
-      UsageType.chat => 'dailyChatCount',
-      UsageType.analysis => 'dailyAnalysisCount',
-      UsageType.planner => 'plannerUsageMinutes',
-    };
-    await ref.set(
-      {
-        'date': today,
-        field: FieldValue.increment(amount),
-        'updatedAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    // Allow — the server is the source of truth and returns a 429 when the
+    // authoritative limit is reached, so nothing is persisted client-side.
     return LimitResult(
       type: type,
       plan: resolvedPlan,

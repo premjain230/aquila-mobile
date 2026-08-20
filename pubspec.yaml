@@ -1,7 +1,7 @@
 name: aquila
 description: "Aquila AI — the AI that helps students think bigger. Mobile companion app sharing the same backend and accounts as the Aquila AI web app."
 publish_to: 'none'
-version: 1.1.0+5
+version: 1.2.0+6
 
 environment:
   sdk: ^3.12.2
