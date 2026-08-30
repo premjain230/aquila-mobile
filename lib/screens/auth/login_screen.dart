@@ -84,11 +84,22 @@ try {
       case 'user-not-found':
         return 'No account found with this email.';
       case 'wrong-password':
-        return 'Incorrect password.';
+      case 'invalid-credential':
+      case 'invalid-login-credentials':
+        return 'Wrong password. Please try again.';
       case 'too-many-requests':
         return 'Too many attempts. Please wait and try again.';
+      case 'user-disabled':
+        return 'This account has been disabled.';
+      case 'network-request-failed':
+        return 'Network error. Please check your connection.';
       default:
-        return e.message ?? 'Sign in failed.';
+        if (e.code.contains('wrong-password') || e.code.contains('invalid-credential')) {
+          return 'Wrong password. Please try again.';
+        }
+        return e.message?.replaceAll(RegExp(r'^Firebase:\s*'), '').replaceAll(RegExp(r'\(auth\/[^)]+\)'), '').trim().isNotEmpty == true
+            ? e.message!.replaceAll(RegExp(r'^Firebase:\s*'), '').replaceAll(RegExp(r'\(auth\/[^)]+\)'), '').trim()
+            : 'Sign in failed. Please try again.';
     }
   }
 
