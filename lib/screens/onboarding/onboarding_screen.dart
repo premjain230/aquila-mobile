@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../learning/onboarding.dart';
@@ -194,6 +194,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (val != null && !(val is List && val.isEmpty)) {
         _answers[q.field] = val;
         await _persist(q.field, val);
+        if(q.id=='competitiveExam' && (_answers['subjects']==null || (_answers['subjects'] is List && (_answers['subjects'] as List).isEmpty))){
+          if(val.toString().contains('NEET')) _answers['subjects']=['Physics','Chemistry','Biology'];
+          else if(val.toString().contains('JEE')) _answers['subjects']=['Physics','Chemistry','Mathematics'];
+        }
       }
     }
     final nxt = getNextOnboardingQuestion(_currentId, _answers);
@@ -306,3 +310,4 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 }
 
 extension _Slice on String { String slice(int s,int e)=> substring(s, e.clamp(0,length)); }
+
