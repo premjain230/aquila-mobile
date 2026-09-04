@@ -7,6 +7,7 @@ import '../../widgets/update_dialog.dart';
 import '../analyze/analyze_screen.dart';
 import '../chat/chat_screen.dart';
 import '../chat/memory_screen.dart';
+import '../home/home_screen.dart';
 import '../planner/planner_screen.dart';
 import '../profile/profile_screen.dart';
 import '../quiz/quiz_screen.dart';
@@ -55,10 +56,11 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final ext = AquilaThemeExt.of(context);
     final screens = [
+      HomeScreen(uid: widget.uid),
       ChatScreen(uid: widget.uid),
-      PlannerScreen(uid: widget.uid),
       QuizScreen(uid: widget.uid),
       AnalyzeScreen(uid: widget.uid),
+      PlannerScreen(uid: widget.uid),
       ProfileScreen(uid: widget.uid),
     ];
 
@@ -92,14 +94,14 @@ class _MainShellState extends State<MainShell> {
             unselectedLabelStyle: const TextStyle(fontFamily: AquilaColors.fontMain),
             items: const [
               BottomNavigationBarItem(
+                icon: Icon(Icons.today_outlined),
+                activeIcon: Icon(Icons.today),
+                label: 'Today',
+              ),
+              BottomNavigationBarItem(
                 icon: Icon(Icons.chat_bubble_outline),
                 activeIcon: Icon(Icons.chat_bubble),
                 label: 'Chat',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.calendar_month_outlined),
-                activeIcon: Icon(Icons.calendar_month),
-                label: 'Plan',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.quiz_outlined),
@@ -110,6 +112,11 @@ class _MainShellState extends State<MainShell> {
                 icon: Icon(Icons.insights_outlined),
                 activeIcon: Icon(Icons.insights),
                 label: 'Analyze',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.calendar_month_outlined),
+                activeIcon: Icon(Icons.calendar_month),
+                label: 'Plan',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.person_outline),
@@ -156,16 +163,18 @@ class _MainShellState extends State<MainShell> {
           ),
           const Divider(),
           ListTile(
-            leading: const Icon(Icons.chat_bubble_outline),
-            title: const Text('Chat'),
+            leading: const Icon(Icons.today_outlined),
+            title: const Text('Today'),
+            selected: _index == 0,
             onTap: () {
               setState(() => _index = 0);
               Navigator.of(context).pop();
             },
           ),
           ListTile(
-            leading: const Icon(Icons.calendar_month_outlined),
-            title: const Text('Planner'),
+            leading: const Icon(Icons.chat_bubble_outline),
+            title: const Text('Chat'),
+            selected: _index == 1,
             onTap: () {
               setState(() => _index = 1);
               Navigator.of(context).pop();
@@ -174,6 +183,7 @@ class _MainShellState extends State<MainShell> {
           ListTile(
             leading: const Icon(Icons.quiz_outlined),
             title: const Text('Quiz'),
+            selected: _index == 2,
             onTap: () {
               setState(() => _index = 2);
               Navigator.of(context).pop();
@@ -182,16 +192,27 @@ class _MainShellState extends State<MainShell> {
           ListTile(
             leading: const Icon(Icons.insights_outlined),
             title: const Text('Analyze'),
+            selected: _index == 3,
             onTap: () {
               setState(() => _index = 3);
               Navigator.of(context).pop();
             },
           ),
           ListTile(
-            leading: const Icon(Icons.person_outline),
-            title: const Text('Profile'),
+            leading: const Icon(Icons.calendar_month_outlined),
+            title: const Text('Planner'),
+            selected: _index == 4,
             onTap: () {
               setState(() => _index = 4);
+              Navigator.of(context).pop();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.person_outline),
+            title: const Text('Profile'),
+            selected: _index == 5,
+            onTap: () {
+              setState(() => _index = 5);
               Navigator.of(context).pop();
             },
           ),

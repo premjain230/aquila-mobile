@@ -101,9 +101,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (p['dailyHours'] != null) m['dailyHours'] = p['dailyHours'];
     if (p['examDate'] != null) m['examDate'] = p['examDate'].toString();
     if (p['weakTopics'] is List) m['weakTopics'] = List<String>.from((p['weakTopics'] as List).map((e) => e.toString()));
+    if (p['prioritySubject'] != null) m['prioritySubject'] = p['prioritySubject'].toString();
+    if (p['competitiveExam'] != null) m['goals.competitiveExam'] = p['competitiveExam'].toString();
     if (p['preferences'] is Map) {
       final pref = Map<String, dynamic>.from(p['preferences'] as Map);
       if (pref['preferredStyle'] != null) m['preferences.preferredStyle'] = pref['preferredStyle'].toString();
+      if (pref['studyBehaviorTags'] is List) m['preferences.studyBehavior'] = List<String>.from((pref['studyBehaviorTags'] as List).map((e) => e.toString()));
+      if (pref['weakTopicsPriority'] != null) m['weakTopics.priority'] = pref['weakTopicsPriority'].toString();
+      if (pref['confidentTopics'] != null) m['confidentTopics'] = pref['confidentTopics'].toString();
     }
     return m;
   }
@@ -143,18 +148,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
     if (patch['subjects'] is List && (patch['subjects'] as List).isNotEmpty) toSave['subjects'] = value;
     if (patch['dailyHours'] != null) toSave['dailyHours'] = value;
+    if (patch['prioritySubject'] != null) toSave['prioritySubject'] = value;
+    if (patch['competitiveExam'] != null) toSave['competitiveExam'] = value;
     if (value is List && field == 'weakTopics') toSave['weakTopics'] = value;
     if (field == 'examDate') toSave['examDate'] = value;
     if (patch['preferences'] is Map) toSave['preferences'] = {...(_profileRaw['preferences'] is Map ? Map<String, dynamic>.from(_profileRaw['preferences'] as Map) : {}), ...Map<String, dynamic>.from(patch['preferences'] as Map)};
     toSave['updatedAt'] = FieldValue.serverTimestamp();
     toSave['learningSchemaVersion'] = 1;
-    await _db.collection('users').doc(widget.uid).collection('learning').doc('profile').set(toSave, SetOptions(merge: true));
-    _profileRaw = {..._profileRaw, ...toSave};
-    // goals subcollection
+    // keep local raw in sync immediately
+    _profileRaw = {..._profileRaw, ...toSave, 'academic': toSave['academic'] ?? _profileRaw['academic'], 'preferences': toSave['preferences'] ?? _profileRaw['preferences']};
+    final ops = <Future>[];
+    ops.add(_db.collection('users').doc(widget.uid).collection('learning').doc('profile').set(toSave, SetOptions(merge: true)).catchError((_) {}));
     if (field == 'goals' && value is List) {
       for (final t in value.map((e) => e.toString())) {
         final gid = 'g_${t.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_').substring(0, t.length.clamp(0, 30))}';
-        await _db.collection('users').doc(widget.uid).collection('goals').doc(gid).set({
+        ops.add(_db.collection('users').doc(widget.uid).collection('goals').doc(gid).set({
           'goalId': gid,
           'uid': widget.uid,
           'title': t,
@@ -164,15 +172,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
           'learningSchemaVersion': 1,
-        }, SetOptions(merge: true));
+        }, SetOptions(merge: true)).catchError((_) {}));
       }
     }
-    await _emit('onboarding_question_answered', {'field': field, 'source': 'self_report'});
+    ops.add(_emit('onboarding_question_answered', {'field': field, 'source': 'self_report'}));
+    ops.add(_emit('onboarding_answered', {'field': field, 'value': value is List ? value.take(5).join(',') : value.toString().substring(0, 120)}));
+    await Future.wait(ops);
   }
 
-  bool _isComplete() {
-    return _answers['academic.grade'] != null && _answers['academic.board'] != null && (_answers['subjects'] is List && (_answers['subjects'] as List).isNotEmpty) && (_answers['goals'] is List && (_answers['goals'] as List).isNotEmpty) && _answers['prioritySubject'] != null && _answers['dailyHours'] != null;
+  List<String> _missingRequired() {
+    final m = <String>[];
+    if (_answers['academic.grade'] == null) m.add('grade');
+    if (_answers['academic.board'] == null) m.add('board');
+    if (_answers['academic.track'] == null) m.add('track');
+    if (!(_answers['subjects'] is List && (_answers['subjects'] as List).isNotEmpty)) m.add('subjects');
+    if (!(_answers['goals'] is List && (_answers['goals'] as List).isNotEmpty)) m.add('goals');
+    if (_answers['prioritySubject'] == null) m.add('prioritySubject');
+    if (_answers['dailyHours'] == null) m.add('dailyHours');
+    return m;
   }
+
+  bool _isComplete() => _missingRequired().isEmpty;
 
   Future<void> _next({bool skip = false}) async {
     if (_currentId == null) return;
@@ -193,7 +213,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       }
       if (val != null && !(val is List && val.isEmpty)) {
         _answers[q.field] = val;
-        await _persist(q.field, val);
+        // instant UI — persist in background like web
+        _persist(q.field, val);
         if(q.id=='competitiveExam' && (_answers['subjects']==null || (_answers['subjects'] is List && (_answers['subjects'] as List).isEmpty))){
           if(val.toString().contains('NEET')) _answers['subjects']=['Physics','Chemistry','Biology'];
           else if(val.toString().contains('JEE')) _answers['subjects']=['Physics','Chemistry','Mathematics'];
@@ -212,7 +233,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         await _emit('onboarding_completed', {'subjects': (_answers['subjects'] as List?)?.length ?? 0});
         if (mounted) setState(() => _currentId = null);
       } else {
-        setState(() => _error = 'Please complete required fields.');
+        final missing = _missingRequired();
+        String? target;
+        if (missing.contains('grade')) target='grade';
+        else if (missing.contains('board')) target='board';
+        else if (missing.contains('track')) target='track';
+        else if (missing.contains('subjects')) target='subjects';
+        else if (missing.contains('goals')) target='goals';
+        else if (missing.contains('prioritySubject')) target='prioritySubject';
+        else if (missing.contains('dailyHours')) target='dailyHours';
+        if (target != null && target != _currentId) {
+          setState(() => _error = 'Missing: ${missing.join(", ")} — taking you there.');
+          if (!_history.contains(target)) _history.add(target);
+          setState(() { _currentId = target; });
+          _hydrateForCurrent();
+          setState(() {});
+        } else {
+          setState(() => _error = 'Please complete required: ${missing.join(", ")}');
+        }
       }
     }
   }

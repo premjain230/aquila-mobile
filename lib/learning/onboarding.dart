@@ -69,6 +69,13 @@ Map<String, dynamic> answersToProfilePatch(Map<String, dynamic> answers) {
     'dailyHours': answers['dailyHours'] ?? 4,
     'weakTopics': answers['weakTopics'] ?? [],
     'examDate': answers['examDate'],
-    'preferences': {'preferredStyle': answers['preferences.preferredStyle'] ?? answers['learningStyle']},
+    'prioritySubject': answers['prioritySubject'],
+    'competitiveExam': answers['goals.competitiveExam'] ?? answers['competitiveExam'],
+    'preferences': {
+      'preferredStyle': answers['preferences.preferredStyle'] ?? answers['learningStyle'],
+      'studyBehaviorTags': answers['preferences.studyBehavior'] ?? answers['studyBehavior'] ?? [],
+      'weakTopicsPriority': answers['weakTopics.priority'],
+      'confidentTopics': answers['confidentTopics'],
+    },
   };
 }
