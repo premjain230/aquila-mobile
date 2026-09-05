@@ -51,10 +51,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _answers = _reconstructAnswers(_profileRaw);
       // try goals subcollection for goals
       try {
-        final gSnap = await _db.collection('users').doc(widget.uid).collection('learning').collection('goals').get();
-        // Actually path is users/{uid}/learning/goals — handle both
-      } catch (_) {}
-      try {
         final g2 = await _db.collection('users').doc(widget.uid).collection('goals').get();
         if (g2.docs.isNotEmpty) {
           _answers['goals'] = g2.docs.map((d) => d.data()['title']?.toString() ?? '').where((s) => s.isNotEmpty).toList();

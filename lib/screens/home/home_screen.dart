@@ -2,8 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fa;
 import 'package:flutter/material.dart';
 
+import '../../learning/evidence.dart';
+import '../../services/api_client.dart';
 import '../../theme/aquila_theme.dart';
-import '../../learning/onboarding.dart';
+import '../analyze/analyze_screen.dart';
+import '../chat/chat_screen.dart';
 import '../quiz/quiz_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -81,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Row(children: [
                 Expanded(child: _SyllabusCard(uid: widget.uid)),
                 const SizedBox(width: 10),
-                Expanded(child: _AIConsoleCard()),
+                Expanded(child: _AIConsoleCard(uid: widget.uid)),
               ]),
               const SizedBox(height: 16),
               // Header
@@ -103,7 +106,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: ext.textMuted)),
                   ]),
                   TextButton(
-                      onPressed: () {},
+                      onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => AnalyzeScreen(uid: widget.uid)),
+                          ),
                       child: Text('View analysis →',
                           style: TextStyle(
                               fontFamily: AquilaColors.fontMain,
@@ -196,14 +202,14 @@ class _SyllabusCard extends StatelessWidget {
         const SizedBox(width: 8),
         ElevatedButton(
             onPressed: () async {
-              // Real upload: create dummy syllabus doc like web (without file picker for now)
               final now = DateTime.now();
+              final fileName = 'syllabus_${now.millisecondsSinceEpoch}.pdf';
               await FirebaseFirestore.instance
                   .collection('users')
                   .doc(uid)
                   .collection('syllabus')
                   .add({
-                'fileName': 'syllabus_${now.millisecondsSinceEpoch}.pdf',
+                'fileName': fileName,
                 'fileType': 'application/pdf',
                 'fileSize': 120000,
                 'snippet': 'Mobile upload',
@@ -217,12 +223,21 @@ class _SyllabusCard extends StatelessWidget {
                   .doc('profile')
                   .set({
                 'syllabus': {
-                  'fileName': 'syllabus_${now.millisecondsSinceEpoch}.pdf',
+                  'fileName': fileName,
                   'uploadedAt': now.toIso8601String(),
                   'status': 'ready'
                 },
                 'updatedAt': FieldValue.serverTimestamp()
               }, SetOptions(merge: true));
+              try {
+                await emitLearningEvent(
+                  FirebaseFirestore.instance,
+                  uid,
+                  'syllabus_uploaded',
+                  source: 'syllabus',
+                  payload: {'fileName': fileName},
+                );
+              } catch (_) {}
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                     content: Text('Syllabus saved — personalising ✓')));
@@ -242,6 +257,8 @@ class _SyllabusCard extends StatelessWidget {
 }
 
 class _AIConsoleCard extends StatelessWidget {
+  final String uid;
+  const _AIConsoleCard({this.uid = ''});
   @override
   Widget build(BuildContext context) {
     final ext = AquilaThemeExt.of(context);
@@ -279,7 +296,20 @@ class _AIConsoleCard extends StatelessWidget {
                       color: Color(0x8CFFFFFF))),
             ])),
         ElevatedButton(
-            onPressed: () {},
+            onPressed: () {
+              if (uid.isNotEmpty) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => ChatScreen(uid: uid)),
+                );
+              } else {
+                // Fallback: try to switch bottom nav via ancestor lookup
+                final shellState = context.findAncestorStateOfType<State>();
+                // Just show hint if no uid
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Open Chat to ask Aquila')),
+                );
+              }
+            },
             style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFF2563EB),
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -480,7 +510,7 @@ class _VolumeCard extends StatelessWidget {
             final h = (totalSecs / 60).floor();
             final m = (totalSecs % 3600) ~/ 60;
             final totalStr = h > 0 ? '${h}h ${m}m' : '${m}m';
-            final avg = days.reduce((a, b) => a + b, 0) / 7;
+            final avg = days.fold<int>(0, (a, b) => a + b) / 7;
             final avgStr = avg < 60
                 ? '${avg.round()}s'
                 : '${(avg / 60).floor()}m';
@@ -815,9 +845,38 @@ class _StockPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-class _NextStepsCard extends StatelessWidget {
+class _NextStepsCard extends StatefulWidget {
   final String uid;
   const _NextStepsCard({required this.uid});
+  @override
+  State<_NextStepsCard> createState() => _NextStepsCardState();
+}
+
+class _NextStepsCardState extends State<_NextStepsCard> {
+  List<Map<String, dynamic>>? _recs;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final res = await ApiClient.instance.getJson('/api/recommendations', auth: true);
+      final list = res['recommendations'];
+      if (list is List) {
+        setState(() {
+          _recs = list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).take(3).toList();
+          _loading = false;
+        });
+        return;
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loading = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final ext = AquilaThemeExt.of(context);
@@ -839,31 +898,44 @@ class _NextStepsCard extends StatelessWidget {
                   backgroundColor: ext.bgInput)),
         ]),
         const SizedBox(height: 10),
-        FutureBuilder<QuerySnapshot>(
-            future: FirebaseFirestore.instance
-                .collection('users')
-                .doc(uid)
-                .collection('learning')
-                .doc('profile')
-                .collection('recommendations')
-                .limit(1)
-                .get()
-                .catchError((_) => null as dynamic),
-            builder: (c, snap) {
-              // fallback: fetch via API is web-only, so show static next steps from local logic or placeholder
-              // For now show 2 placeholder diagnostics like web
-              return Column(children: [
-                _RecCard(
-                    title: 'mathematics • mathematics',
-                    reason: 'low_evidence',
-                    action: 'diagnostic →'),
-                const SizedBox(height: 8),
-                _RecCard(
-                    title: 'biology • biology',
-                    reason: 'low_evidence',
-                    action: 'diagnostic →'),
-              ]);
-            }),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          )
+        else if (_recs != null && _recs!.isNotEmpty)
+          Column(
+            children: [
+              for (final r in _recs!)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _RecCard(
+                    title:
+                        '${r['subject'] ?? 'general'} • ${r['topic'] ?? r['conceptId'] ?? ''}',
+                    reason: r['reason']?.toString() ?? r['action']?.toString() ?? 'recommended',
+                    action: '${r['action'] ?? 'review'} →',
+                  ),
+                ),
+            ],
+          )
+        else
+          Column(children: [
+            _RecCard(
+                title: 'mathematics • algebra',
+                reason: 'low_evidence',
+                action: 'practice →'),
+            const SizedBox(height: 8),
+            _RecCard(
+                title: 'biology • cell structure',
+                reason: 'low_evidence',
+                action: 'diagnostic →'),
+            const SizedBox(height: 8),
+            Text('Take a quiz to get personalised steps',
+                style: TextStyle(
+                    fontFamily: AquilaColors.fontMain,
+                    fontSize: 10,
+                    color: ext.textMuted)),
+          ]),
       ]),
     );
   }

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../learning/evidence.dart';
 import '../../models/plan_models.dart';
 import '../../models/usage_models.dart';
 import '../../services/auth_service.dart';
@@ -110,6 +113,11 @@ class _PlannerOnboardingScreenState extends State<PlannerOnboardingScreen> {
   Future<void> _generate() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_examDate.isBefore(_startDate)) {
+      showAquilaSnack(context, 'Exam date must be after start date.', error: true);
+      return;
+    }
+
     // Planner usage gate (mirrors web daily planner minutes).
     final result = await LimitsService.instance.consume(
       widget.uid,
@@ -137,8 +145,11 @@ class _PlannerOnboardingScreenState extends State<PlannerOnboardingScreen> {
       final weeks = await PlannerService.instance.generatePlan(request);
       if (!mounted) return;
       await PlannerService.instance.saveExamProfile(widget.uid, request);
-      final planId =
-          await PlannerService.instance.savePlan(widget.uid, weeks);
+      final planId = await PlannerService.instance.savePlan(
+        widget.uid,
+        weeks,
+        examType: request.examType,
+      );
       await PlannerService.instance.createTasksFromPlan(
         uid: widget.uid,
         planId: planId,
@@ -146,6 +157,28 @@ class _PlannerOnboardingScreenState extends State<PlannerOnboardingScreen> {
         startDateIso: _ymd(_startDate),
       );
       await AuthService.instance.completeOnboarding(widget.uid);
+      // Analytics parity with web (logEvent)
+      try {
+        await FirebaseFirestore.instance
+            .collection('analytics')
+            .doc(widget.uid)
+            .collection('events')
+            .add({
+          'type': 'plan_generated',
+          'examType': request.examType,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(widget.uid)
+            .collection('analytics')
+            .add({
+          'type': 'plan_generated',
+          'examType': request.examType,
+          'timestamp': FieldValue.serverTimestamp(),
+          'metadata': {'examType': request.examType, 'weeklyPlanLength': weeks.length},
+        });
+      } catch (_) {}
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -273,8 +306,7 @@ class _PlannerOnboardingScreenState extends State<PlannerOnboardingScreen> {
           initialValue: _examType,
           dropdownColor: ext.bgCard,
           items: const [
-            'JEE', 'NEET', 'Boards', 'Olympiads', 'UPSC', 'SAT',
-            'University Course', 'Other',
+            'JEE', 'NEET', 'BOARDS', 'COLLEGE', 'CUSTOM',
           ]
               .map((e) => DropdownMenuItem(value: e, child: Text(e)))
               .toList(),
@@ -318,10 +350,10 @@ class _PlannerOnboardingScreenState extends State<PlannerOnboardingScreen> {
         TextFormField(
           controller: _dailyHours,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: 'e.g. 3'),
+          decoration: const InputDecoration(hintText: 'e.g. 6'),
           validator: (v) {
             final n = int.tryParse(v ?? '');
-            return (n == null || n < 1 || n > 14) ? 'Between 1 and 14 hours' : null;
+            return (n == null || n < 1 || n > 18) ? 'Between 1 and 18 hours' : null;
           },
         ),
         const SizedBox(height: 20),

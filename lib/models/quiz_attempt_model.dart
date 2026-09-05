@@ -44,16 +44,25 @@ class QuizAttempt {
       takenAt = t;
     }
 
+    // Support both web field names (totalQ/correct/mode) and mobile aliases
+    final totalQ = (d['totalQ'] as num?)?.toInt() ??
+        (d['totalQuestions'] as num?)?.toInt() ??
+        0;
+    final correct = (d['correct'] as num?)?.toInt() ??
+        (d['correctCount'] as num?)?.toInt() ??
+        0;
+    final type = d['mode']?.toString() ?? d['type']?.toString() ?? 'standard';
+
     return QuizAttempt(
       id: doc.id,
       subject: d['subject']?.toString() ?? '',
       topic: d['topic']?.toString() ?? '',
-      correctCount: (d['correctCount'] as num?)?.toInt() ?? 0,
-      totalQuestions: (d['totalQuestions'] as num?)?.toInt() ?? 0,
+      correctCount: correct,
+      totalQuestions: totalQ,
       takenAt: takenAt,
       answers: answers,
-      type: d['type']?.toString() ?? 'standard',
-      score: (d['score'] as num?) ?? 0,
+      type: type,
+      score: (d['score'] as num?) ?? correct,
     );
   }
 }

@@ -62,13 +62,22 @@ class PlannerService {
   }
 
   /// Saves the weekly plan as a `studyPlans/{planId}` doc and returns its id.
-  Future<String> savePlan(String uid, List<PlanWeek> weeks) async {
+  /// Mirrors web `saveStudyPlan` shape so the website planner reads the same doc.
+  Future<String> savePlan(String uid, List<PlanWeek> weeks,
+      {String examType = '', String summary = ''}) async {
     final ref = _db.collection('studyPlans').doc();
     await ref.set({
       'planId': ref.id,
-      'uid': uid,
+      'userId': uid,
+      'uid': uid, // legacy compat for older mobile builds
       'title': 'My Study Plan',
+      'examType': examType,
+      'summary': summary,
+      'daysUntilExam': 0,
       'weeklyPlan': weeks.map(_weekToMap).toList(),
+      'subjectAllocation': <String, dynamic>{},
+      'revisionSchedule': <String, dynamic>{},
+      'milestones': <dynamic>[],
       'status': 'active',
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -101,8 +110,9 @@ class PlannerService {
             .toList(),
       };
 
-  /// Flattens weekly days into dated task docs under `users/{uid}/tasks`
-  /// (mirrors createTasksFromPlan).
+  /// Flattens weekly days into dated task docs in top-level `tasks`
+  /// (mirrors web `createTasksFromPlan` — same collection + shape so the
+  /// website sees the mobile-created plan and vice versa).
   Future<void> createTasksFromPlan({
     required String uid,
     required String planId,
@@ -110,7 +120,7 @@ class PlannerService {
     required String startDateIso,
   }) async {
     final start = DateTime.tryParse(startDateIso) ?? DateTime.now();
-    final col = _db.collection('users').doc(uid).collection('tasks');
+    final batch = _db.batch();
     var index = 0;
     for (final week in weeks) {
       for (final day in week.days) {
@@ -119,40 +129,92 @@ class PlannerService {
           final offsetFromStart =
               (week.week - 1) * 7 + _weekdayIndex(day.day);
           final scheduled = start.add(Duration(days: offsetFromStart));
-          await col.add({
-            'taskId': '$uid-$planId-$index',
+          final scheduledIso =
+              '${scheduled.year.toString().padLeft(4, '0')}-${scheduled.month.toString().padLeft(2, '0')}-${scheduled.day.toString().padLeft(2, '0')}';
+          final ref = _db.collection('tasks').doc();
+          batch.set(ref, {
+            'taskId': ref.id,
+            'planId': planId,
+            'userId': uid,
+            // Scheduled date as ISO string for web compatibility (planner.html
+            // compares string < today), plus Timestamp for mobile sorting.
+            'scheduledDate': scheduledIso,
+            'scheduledAt': Timestamp.fromDate(scheduled),
+            'day': day.day,
+            'weekDay': day.day, // compat for older mobile builds
+            'week': week.week,
             'subject': s.subject,
             'topic': s.topic,
             'durationMinutes': s.durationMinutes,
             'type': s.type,
             'priority': s.priority,
             'status': 'pending',
-            'week': week.week,
-            'weekDay': day.day,
-            'scheduledDate': Timestamp.fromDate(scheduled),
+            'completedAt': null,
             'createdAt': FieldValue.serverTimestamp(),
           });
         }
       }
     }
+    await batch.commit();
   }
 
-  /// Streams tasks for the planner dashboard.
+  /// Streams tasks for the planner dashboard (top-level `tasks` collection
+  /// filtered by userId — compatible with web planner).
   Stream<List<StudyTask>> tasksStream(String uid) {
     return _db
-        .collection('users')
-        .doc(uid)
         .collection('tasks')
-        .orderBy('scheduledDate')
+        .where('userId', isEqualTo: uid)
         .snapshots()
-        .map((snap) => snap.docs.map(StudyTask.fromDoc).toList(growable: false));
+        .map((snap) {
+          final list = snap.docs.map(StudyTask.fromDoc).toList(growable: false);
+          list.sort((a, b) {
+            final c = a.week.compareTo(b.week);
+            if (c != 0) return c;
+            return a.scheduledDate.compareTo(b.scheduledDate);
+          });
+          return list;
+        });
   }
 
   Future<void> updateTaskStatus(String uid, String docId, String status) async {
-    await _db.collection('users').doc(uid).collection('tasks').doc(docId).set(
-      {'status': status, 'updatedAt': FieldValue.serverTimestamp()},
-      SetOptions(merge: true),
-    );
+    final ref = _db.collection('tasks').doc(docId);
+    final snap = await ref.get();
+    if (snap.exists && snap.data()?['userId'] == uid) {
+      final update = <String, dynamic>{
+        'status': status,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      if (status == 'completed') update['completedAt'] = FieldValue.serverTimestamp();
+      await ref.update(update);
+      // Mirror web _updateProgressCounters
+      try {
+        final data = snap.data()!;
+        final progressRef = _db.collection('progress').doc(uid);
+        final updates = <String, dynamic>{'lastUpdated': FieldValue.serverTimestamp()};
+        if (status == 'completed') {
+          final subject = data['subject']?.toString() ?? 'general';
+          final dur = (data['durationMinutes'] as num?)?.toDouble() ?? 60;
+          updates['subjectHours.$subject'] = FieldValue.increment(dur / 60);
+          updates['totalMinutesStudied'] = FieldValue.increment(dur);
+          updates['tasksCompleted'] = FieldValue.increment(1);
+        }
+        if (status == 'skipped') {
+          updates['tasksSkipped'] = FieldValue.increment(1);
+        }
+        await progressRef.set(updates, SetOptions(merge: true));
+      } catch (_) {}
+    } else {
+      // Fallback for old users/{uid}/tasks docs (legacy mobile path)
+      await _db
+          .collection('users')
+          .doc(uid)
+          .collection('tasks')
+          .doc(docId)
+          .set(
+        {'status': status, 'updatedAt': FieldValue.serverTimestamp()},
+        SetOptions(merge: true),
+      );
+    }
   }
 
   /// Triggers replanning via `/api/replan` and applies returned adjustments.
@@ -165,8 +227,8 @@ class PlannerService {
     final res = await ApiClient.instance.postJson(AppConfig.replanPath, {
       if (missedTasks.isNotEmpty) 'missedTasks': missedTasks,
       'dailyHours': dailyHours,
-      'examDate': ?examDate,
-      'examType': ?examType,
+      if (examDate != null) 'examDate': examDate,
+      if (examType != null) 'examType': examType,
     });
     return res;
   }

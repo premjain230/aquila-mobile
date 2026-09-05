@@ -95,7 +95,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
                   itemCount: _items!.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (context, i) {
                     final m = _items![i];
                     return Container(

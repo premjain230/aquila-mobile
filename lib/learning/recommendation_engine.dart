@@ -52,7 +52,7 @@ String _chooseReason({required double masteryScore, required double evidenceStre
   return "stable_maintenance";
 }
 
-List<Map<String,dynamic>> getRecommendations({Map<String,dynamic> masteryMap={}, Map<String,dynamic> reviewsMap={}, List<dynamic> misconceptions=[], Map<String,dynamic>? profile, int limit=5}){
+List<Map<String,dynamic>> getRecommendations({Map<String,dynamic> masteryMap=const {}, Map<String,dynamic> reviewsMap=const {}, List<dynamic> misconceptions=const [], Map<String,dynamic>? profile, int limit=5}){
   limit = limit.clamp(1,10);
   final misconceptionSet = misconceptions.where((m)=> m is Map && m['resolved']!=true).map((m)=> (m as Map)['conceptId'].toString()).toSet();
   final conceptIds = <String>{...masteryMap.keys, ...reviewsMap.keys, ...misconceptionSet};
@@ -106,7 +106,7 @@ List<Map<String,dynamic>> getRecommendations({Map<String,dynamic> masteryMap={},
   return diversified.take(limit).toList();
 }
 
-Map<String,dynamic>? getNextBestAction({Map<String,dynamic> masteryMap={}, Map<String,dynamic> reviewsMap={}, List<dynamic> misconceptions=[], Map<String,dynamic>? profile}){
+Map<String,dynamic>? getNextBestAction({Map<String,dynamic> masteryMap=const {}, Map<String,dynamic> reviewsMap=const {}, List<dynamic> misconceptions=const [], Map<String,dynamic>? profile}){
   final recs=getRecommendations(masteryMap:masteryMap, reviewsMap:reviewsMap, misconceptions:misconceptions, profile:profile, limit:1);
   return recs.isEmpty? null : recs.first;
 }

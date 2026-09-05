@@ -1,6 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/app_config.dart';
 import '../../models/aquila_user.dart';
+import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../theme/aquila_theme.dart';
 import '../../widgets/common.dart';
@@ -24,6 +27,8 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  bool _generatingLetter = false;
+
   Future<void> _logout() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -48,6 +53,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _setPersonality(String value) async {
     await AuthService.instance.updatePersonality(widget.uid, value);
     if (mounted) showAquilaSnack(context, 'AI personality updated');
+  }
+
+  Future<void> _generateLetter(AquilaUser user) async {
+    if (_generatingLetter) return;
+    setState(() => _generatingLetter = true);
+    try {
+      final name = user.displayName.isNotEmpty ? user.displayName : 'there';
+      final prompt =
+          'Write a heartfelt 200-300 word letter from the future self to $name. '
+          'They are a student using Aquila AI. Make it encouraging, specific, and warm. '
+          'Mention growth, resilience, and keeping curiosity alive. No preachy tone.';
+      var letter = '';
+      await for (final delta in ApiClient.instance.streamJson(
+        AppConfig.groqProxyPath,
+        {
+          'model': AppConfig.chatModel,
+          'messages': [
+            {'role': 'system', 'content': 'You are a compassionate letter writer. Write only the letter.'},
+            {'role': 'user', 'content': prompt},
+          ],
+          'max_tokens': 1024,
+          'temperature': 0.8,
+          'stream': true,
+        },
+        auth: true,
+      )) {
+        letter += delta;
+      }
+      letter = letter.trim();
+      if (letter.isEmpty) throw Exception('Empty');
+      await FirebaseFirestore.instance.collection('users').doc(widget.uid).set({
+        'futureMeLetter': letter,
+        'futureMeLetterDate': DateTime.now().toIso8601String(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      if (mounted) showAquilaSnack(context, 'Letter saved to your profile');
+    } catch (e) {
+      if (mounted) showAquilaSnack(context, 'Could not generate letter. Check connection.', error: true);
+    } finally {
+      if (mounted) setState(() => _generatingLetter = false);
+    }
   }
 
   @override
@@ -228,21 +274,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: ext.border),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.mail_outline, color: hasLetter ? AquilaColors.green : AquilaColors.accent2),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              hasLetter
-                  ? 'Your Future Me letter is saved. (Not editable in this build.)'
-                  : 'Your Future Me letter is saved.',
-              style: TextStyle(
-                fontFamily: AquilaColors.fontMain,
-                fontSize: 13.5,
-                color: ext.textPrimary,
+          Row(
+            children: [
+              Icon(Icons.mail_outline, color: hasLetter ? AquilaColors.green : AquilaColors.accent2),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  hasLetter ? user.futureMeLetter : 'Write a letter from your future self — Aquila will craft it for you.',
+                  style: TextStyle(
+                    fontFamily: hasLetter ? AquilaColors.fontMain : AquilaColors.fontMain,
+                    fontSize: hasLetter ? 13 : 13.5,
+                    fontStyle: hasLetter ? FontStyle.italic : FontStyle.normal,
+                    height: 1.5,
+                    color: ext.textPrimary,
+                  ),
+                ),
               ),
-            ),
+            ],
+          ),
+          if (hasLetter) ...[
+            const SizedBox(height: 8),
+            Text(user.futureMeLetter.length > 120 ? '' : '',
+                style: TextStyle(fontSize: 10, color: ext.textMuted)),
+          ],
+          const SizedBox(height: 12),
+          AquilaGradientButton(
+            label: _generatingLetter
+                ? 'Writing…'
+                : hasLetter
+                    ? 'Regenerate Letter'
+                    : 'Write My Letter',
+            loading: _generatingLetter,
+            onPressed: () => _generateLetter(user),
+            height: 44,
           ),
         ],
       ),

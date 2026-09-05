@@ -9,8 +9,10 @@ class QuizService {
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  /// Persists a finished attempt to `users/{uid}/quizAttempts` (mirrors web
-  /// finishQuiz).
+  /// Persists a finished attempt to `users/{uid}/quizAttempts`.
+  ///
+  /// Mirrors web `finishQuiz` shape exactly so `firestore.rules` allow the write
+  /// and the website's Analyze page reads the same fields.
   Future<void> saveAttempt(
     String uid, {
     required String subject,
@@ -21,14 +23,25 @@ class QuizService {
     required List<Map<String, dynamic>> answers,
     required String type,
   }) async {
+    final incorrect = (totalQuestions - correctCount).clamp(0, totalQuestions);
+    final title = '$subject • $topic';
     await _db.collection('users').doc(uid).collection('quizAttempts').add({
+      // Fields required by firestore.rules + web analyze
       'subject': subject,
       'topic': topic,
+      'title': title,
+      'totalQ': totalQuestions,
+      'correct': correctCount,
+      'incorrect': incorrect,
+      'skipped': 0,
+      'score': score,
+      'maxScore': totalQuestions,
+      'mode': type,
+      // Mobile-compat aliases (so mobile readers don't need to change)
       'correctCount': correctCount,
       'totalQuestions': totalQuestions,
-      'score': score,
-      'answers': answers,
       'type': type,
+      'answers': answers,
       'takenAt': FieldValue.serverTimestamp(),
     });
   }

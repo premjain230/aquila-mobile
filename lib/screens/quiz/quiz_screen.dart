@@ -2,8 +2,11 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../core/app_config.dart';
 import '../../data/question_bank.dart';
+import '../../learning/evidence.dart';
 import '../../services/api_client.dart';
 import '../../services/quiz_service.dart';
 import '../../theme/aquila_theme.dart';
@@ -214,6 +217,18 @@ class _QuizScreenState extends State<QuizScreen> {
         _finished = false;
         _loading = false;
       });
+      // Learning event: quiz_started (mirrors web)
+      try {
+        await emitLearningEvent(
+          FirebaseFirestore.instance,
+          widget.uid,
+          'quiz_started',
+          subject: _subject,
+          topic: _topic ?? 'Mixed',
+          source: _aiMode ? 'quiz' : 'quiz',
+          payload: {'totalQ': _questions.length, 'mode': _aiMode ? 'ai' : 'standard'},
+        );
+      } catch (_) {}
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
@@ -489,6 +504,28 @@ class _QuizScreenState extends State<QuizScreen> {
         'correct': a == q.answer,
         'explanation': q.explanation,
       });
+      // Per-question learning events (mirrors web quiz flow)
+      try {
+        final isCorrect = a == q.answer;
+        await emitLearningEvent(
+          FirebaseFirestore.instance,
+          widget.uid,
+          isCorrect ? 'question_correct' : 'question_incorrect',
+          subject: _subject,
+          topic: _topic ?? 'Mixed',
+          source: 'quiz',
+          payload: {'correct': isCorrect, 'hintCount': 0, 'questionIndex': i},
+        );
+        await emitLearningEvent(
+          FirebaseFirestore.instance,
+          widget.uid,
+          'question_answered',
+          subject: _subject,
+          topic: _topic ?? 'Mixed',
+          source: 'quiz',
+          payload: {'correct': isCorrect, 'hintCount': 0, 'questionIndex': i},
+        );
+      } catch (_) {}
     }
     try {
       await QuizService.instance.saveAttempt(
@@ -500,6 +537,20 @@ class _QuizScreenState extends State<QuizScreen> {
         score: _correct * 1.0,
         answers: answers,
         type: _aiMode ? 'ai' : 'standard',
+      );
+      await emitLearningEvent(
+        FirebaseFirestore.instance,
+        widget.uid,
+        'quiz_completed',
+        subject: _subject,
+        topic: _topic ?? 'Mixed',
+        source: 'quiz',
+        payload: {
+          'correct': _correct,
+          'totalQ': _questions.length,
+          'accuracy': _questions.isEmpty ? 0 : _correct / _questions.length,
+          'mode': _aiMode ? 'ai' : 'standard'
+        },
       );
     } catch (_) {
       // Result still shows locally even if saving failed.

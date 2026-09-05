@@ -39,7 +39,7 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
           return ListView.separated(
             padding: const EdgeInsets.only(bottom: 8),
             itemCount: sessions.length,
-            separatorBuilder: (_, _) =>
+            separatorBuilder: (_, __) =>
                 Divider(height: 1, indent: 16, endIndent: 16, color: ext.border),
             itemBuilder: (context, i) {
               final s = sessions[i];

@@ -14,6 +14,7 @@ import '../quiz/quiz_screen.dart';
 import '../referral/referral_screen.dart';
 import '../settings/about_screen.dart';
 import '../settings/settings_screen.dart';
+import '../study_session/study_session_screen.dart';
 import '../subscription/subscription_screen.dart';
 
 /// Root logged-in scaffold: bottom navigation switching between the primary
@@ -216,6 +217,14 @@ class _MainShellState extends State<MainShell> {
               Navigator.of(context).pop();
             },
           ),
+          _drawerMenuTile(Icons.timer_outlined, 'Study Session', () {
+            Navigator.of(context).pop();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => StudySessionScreen(uid: widget.uid),
+              ),
+            );
+          }),
           const Divider(),
           _drawerMenuTile(Icons.settings_outlined, 'Settings', () {
             Navigator.of(context).pop();

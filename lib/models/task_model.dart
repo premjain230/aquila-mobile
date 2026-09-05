@@ -47,14 +47,21 @@ class StudyTask {
 
   factory StudyTask.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? const {};
-    final dateVal = d['scheduledDate'];
+    // scheduledDate: web stores as YYYY-MM-DD string, mobile as Timestamp/iso.
+    final dateVal = d['scheduledDate'] ?? d['scheduledAt'];
     DateTime date;
     if (dateVal is Timestamp) {
       date = dateVal.toDate();
     } else if (dateVal is DateTime) {
       date = dateVal;
+    } else if (dateVal is String) {
+      date = DateTime.tryParse(dateVal) ?? DateTime.now();
     } else {
-      date = DateTime.now();
+      // Fallback: try scheduledAt if scheduledDate was string null
+      final alt = d['scheduledAt'];
+      if (alt is Timestamp) date = alt.toDate();
+      else if (alt is String) date = DateTime.tryParse(alt) ?? DateTime.now();
+      else date = DateTime.now();
     }
     return StudyTask(
       docId: doc.id,
@@ -66,7 +73,7 @@ class StudyTask {
       priority: d['priority']?.toString() ?? 'medium',
       status: d['status']?.toString() ?? 'pending',
       scheduledDate: date,
-      weekDay: d['weekDay']?.toString(),
+      weekDay: (d['weekDay'] ?? d['day'])?.toString(),
       week: (d['week'] as num?)?.toInt() ?? 1,
     );
   }
