@@ -17,6 +17,10 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Fix Groovy for Java 17
+        run: |
+          echo "org.gradle.jvmargs=-Xmx4g --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED" >> android/gradle.properties
+          cat android/gradle.properties || true
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.x'
