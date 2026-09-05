@@ -27,6 +27,8 @@ android {
             // Release signing uses debug keystore for store-agnostic distribution via GitHub releases.
             // Replace with a dedicated upload keystore before Play Store submission.
             signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

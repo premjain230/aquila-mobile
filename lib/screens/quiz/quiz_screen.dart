@@ -381,27 +381,32 @@ class _QuizScreenState extends State<QuizScreen> {
                   Row(
                     children: [
                       if (_index > 0)
-                        AquilaOutlineButton(
-                          label: 'Previous',
-                          onPressed: () => setState(() {
-                            _index--;
-                            _revealed = false;
-                          }),
+                        Expanded(
+                          child: AquilaOutlineButton(
+                            label: 'Previous',
+                            onPressed: () => setState(() {
+                              _index--;
+                              _revealed = false;
+                            }),
+                          ),
                         )
                       else
-                        const SizedBox.shrink(),
-                      const Spacer(),
-                      AquilaGradientButton(
-                        label: _index == _questions.length - 1 ? 'See Results' : 'Next',
-                        height: 48,
-                        onPressed: () => setState(() {
-                          if (_index == _questions.length - 1) {
-                            _submit();
-                          } else {
-                            _index++;
-                            _revealed = false;
-                          }
-                        }),
+                        const Expanded(child: SizedBox.shrink()),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: AquilaGradientButton(
+                          label: _index == _questions.length - 1 ? 'See Results' : 'Next',
+                          height: 48,
+                          fullWidth: false,
+                          onPressed: () => setState(() {
+                            if (_index == _questions.length - 1) {
+                              _submit();
+                            } else {
+                              _index++;
+                              _revealed = false;
+                            }
+                          }),
+                        ),
                       ),
                     ],
                   ),

@@ -53,6 +53,25 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
+  Future<bool> _onWillPop() async {
+    if (_index != 0) {
+      setState(() => _index = 0);
+      return false;
+    }
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Exit Aquila?'),
+        content: const Text('Are you sure you want to exit?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Stay')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Exit')),
+        ],
+      ),
+    );
+    return shouldExit ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final ext = AquilaThemeExt.of(context);
@@ -65,66 +84,75 @@ class _MainShellState extends State<MainShell> {
       ProfileScreen(uid: widget.uid),
     ];
 
-    return Scaffold(
-      key: MainShell.scaffoldKey,
-      drawer: _buildDrawer(ext),
-      body: IndexedStack(
-        index: _index,
-        children: screens,
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: ext.bgSidebar,
-          border: Border(top: BorderSide(color: ext.border)),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldPop = await _onWillPop();
+        if (shouldPop && context.mounted) Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        key: MainShell.scaffoldKey,
+        resizeToAvoidBottomInset: false,
+        drawer: _buildDrawer(ext),
+        body: IndexedStack(
+          index: _index,
+          children: screens,
         ),
-        child: SafeArea(
-          top: false,
-          child: BottomNavigationBar(
-            currentIndex: _index,
-            onTap: (i) => setState(() => _index = i),
-            backgroundColor: ext.bgSidebar,
-            type: BottomNavigationBarType.fixed,
-            selectedItemColor: AquilaColors.accent,
-            unselectedItemColor: ext.textSecondary,
-            selectedFontSize: 11,
-            unselectedFontSize: 11,
-            selectedLabelStyle: const TextStyle(
-              fontFamily: AquilaColors.fontMain,
-              fontWeight: FontWeight.w600,
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: ext.bgSidebar,
+            border: Border(top: BorderSide(color: ext.border)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: BottomNavigationBar(
+              currentIndex: _index,
+              onTap: (i) => setState(() => _index = i),
+              backgroundColor: ext.bgSidebar,
+              type: BottomNavigationBarType.fixed,
+              selectedItemColor: AquilaColors.accent,
+              unselectedItemColor: ext.textSecondary,
+              selectedFontSize: 11,
+              unselectedFontSize: 11,
+              selectedLabelStyle: const TextStyle(
+                fontFamily: AquilaColors.fontMain,
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: const TextStyle(fontFamily: AquilaColors.fontMain),
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.today_outlined),
+                  activeIcon: Icon(Icons.today),
+                  label: 'Today',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.chat_bubble_outline),
+                  activeIcon: Icon(Icons.chat_bubble),
+                  label: 'Chat',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.quiz_outlined),
+                  activeIcon: Icon(Icons.quiz),
+                  label: 'Quiz',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.insights_outlined),
+                  activeIcon: Icon(Icons.insights),
+                  label: 'Analyze',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.calendar_month_outlined),
+                  activeIcon: Icon(Icons.calendar_month),
+                  label: 'Plan',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person_outline),
+                  activeIcon: Icon(Icons.person),
+                  label: 'Profile',
+                ),
+              ],
             ),
-            unselectedLabelStyle: const TextStyle(fontFamily: AquilaColors.fontMain),
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.today_outlined),
-                activeIcon: Icon(Icons.today),
-                label: 'Today',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.chat_bubble_outline),
-                activeIcon: Icon(Icons.chat_bubble),
-                label: 'Chat',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.quiz_outlined),
-                activeIcon: Icon(Icons.quiz),
-                label: 'Quiz',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.insights_outlined),
-                activeIcon: Icon(Icons.insights),
-                label: 'Analyze',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.calendar_month_outlined),
-                activeIcon: Icon(Icons.calendar_month),
-                label: 'Plan',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline),
-                activeIcon: Icon(Icons.person),
-                label: 'Profile',
-              ),
-            ],
           ),
         ),
       ),
@@ -136,7 +164,8 @@ class _MainShellState extends State<MainShell> {
   Widget _buildDrawer(AquilaThemeExt ext) {
     return Drawer(
       backgroundColor: ext.bgSidebar,
-      child: ListView(
+      child: SafeArea(
+        child: ListView(
         padding: EdgeInsets.zero,
         children: [
           Padding(
@@ -265,6 +294,7 @@ class _MainShellState extends State<MainShell> {
             );
           }),
         ],
+        ),
       ),
     );
   }

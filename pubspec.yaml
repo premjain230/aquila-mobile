@@ -1,7 +1,7 @@
 name: aquila
 description: "Aquila AI — the AI that helps students think bigger. Mobile companion app sharing the same backend and accounts as the Aquila AI web app."
 publish_to: 'none'
-version: 1.4.0+8
+version: 1.4.1+9
 
 environment:
   sdk: ">=3.2.0 <4.0.0"
@@ -15,7 +15,9 @@ dependencies:
   firebase_core: ^3.8.0
   firebase_auth: ^5.3.3
   cloud_firestore: ^5.5.1
+  firebase_storage: ^12.3.0
   google_sign_in: ^6.2.2
+  file_picker: ^8.1.0
 
   # Persistence & platform
   shared_preferences: ^2.3.4

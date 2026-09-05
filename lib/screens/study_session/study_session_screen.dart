@@ -48,6 +48,14 @@ class _StudySessionScreenState extends State<StudySessionScreen> {
     _topic.dispose();
     _goal.dispose();
     _timer?.cancel();
+    // If user leaves while session active, mark as abandoned and persist time
+    if (_sessionRef != null) {
+      _sessionRef!.set({
+        'status': 'abandoned',
+        'timeFocused': _elapsed,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
     super.dispose();
   }
 

@@ -295,11 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
-          if (hasLetter) ...[
-            const SizedBox(height: 8),
-            Text(user.futureMeLetter.length > 120 ? '' : '',
-                style: TextStyle(fontSize: 10, color: ext.textMuted)),
-          ],
+
           const SizedBox(height: 12),
           AquilaGradientButton(
             label: _generatingLetter

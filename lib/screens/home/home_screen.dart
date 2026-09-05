@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fa;
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 
 import '../../learning/evidence.dart';
@@ -141,116 +145,187 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// Compact syllabus — real, not showpiece
-class _SyllabusCard extends StatelessWidget {
+// Compact syllabus — real upload with Storage + Firestore, not fake
+class _SyllabusCard extends StatefulWidget {
   final String uid;
   const _SyllabusCard({required this.uid});
+  @override
+  State<_SyllabusCard> createState() => _SyllabusCardState();
+}
+
+class _SyllabusCardState extends State<_SyllabusCard> {
+  bool _uploading = false;
+
+  String _safeFileName(String name) {
+    if (name.length <= 18) return name;
+    return '${name.substring(0, 18)}…';
+  }
+
+  Future<void> _pickAndUpload() async {
+    if (_uploading) return;
+    setState(() => _uploading = true);
+    try {
+      final user = fa.FirebaseAuth.instance.currentUser;
+      if (user == null || user.uid != widget.uid) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please sign in to upload your syllabus')));
+        return;
+      }
+      // Force token refresh to avoid "Missing or insufficient permissions" from stale token
+      try { await user.getIdToken(true); } catch (e) { debugPrint('Token refresh failed: $e'); }
+
+      // Pick file
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      final name = file.name;
+      final bytes = file.bytes;
+      final size = file.size;
+
+      // Validation
+      if (size > 8 * 1024 * 1024) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Max 8MB — please choose a smaller file')));
+        return;
+      }
+      final lower = name.toLowerCase();
+      if (!lower.endsWith('.pdf') && !lower.endsWith('.jpg') && !lower.endsWith('.jpeg') && !lower.endsWith('.png')) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Only JPG, PNG, PDF allowed')));
+        return;
+      }
+      if ((bytes == null || bytes.isEmpty) && file.path == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not read file')));
+        return;
+      }
+
+      // Build snippet (first 500 chars if possible)
+      String snippet = '';
+      try {
+        if (lower.endsWith('.pdf')) {
+          snippet = '[PDF $name ${ (size/1024).round()}KB] — will personalise after server parse';
+        } else if (bytes != null && bytes!.isNotEmpty) {
+          final end = bytes!.length > 8192 ? 8192 : bytes!.length;
+          final text = String.fromCharCodes(bytes!.sublist(0, end));
+          snippet = text.trim().isEmpty ? '[Image $name]' : text.substring(0, text.length.clamp(0, 500));
+          if (snippet.trim().isEmpty) snippet = '[Image $name]';
+        } else {
+          snippet = '[File $name]';
+        }
+      } catch (_) { snippet = '[File $name]'; }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Uploading $name…')));
+      }
+
+      // Upload to Firebase Storage at users/{uid}/syllabus/{id}/{name}
+      final id = DateTime.now().millisecondsSinceEpoch.toString();
+      final storageRef = FirebaseStorage.instance.ref().child('users/${widget.uid}/syllabus/$id/$name');
+      UploadTask uploadTask;
+      if (bytes != null && bytes.isNotEmpty) {
+        uploadTask = storageRef.putData(bytes, SettableMetadata(contentType: file.extension == 'pdf' ? 'application/pdf' : 'image/${file.extension}'));
+      } else if (file.path != null) {
+        uploadTask = storageRef.putFile(File(file.path!));
+      } else {
+        throw Exception('No file data');
+      }
+      final snap = await uploadTask;
+      final downloadUrl = await snap.ref.getDownloadURL();
+
+      final now = DateTime.now();
+      await FirebaseFirestore.instance.collection('users').doc(widget.uid).collection('syllabus').doc(id).set({
+        'fileName': name,
+        'fileType': file.extension ?? 'unknown',
+        'fileSize': size,
+        'storageUrl': downloadUrl,
+        'storagePath': 'users/${widget.uid}/syllabus/$id/$name',
+        'snippet': snippet.substring(0, snippet.length.clamp(0, 4000)),
+        'uploadedAt': FieldValue.serverTimestamp(),
+        'status': 'ready',
+      });
+      await FirebaseFirestore.instance.collection('users').doc(widget.uid).collection('learning').doc('profile').set({
+        'syllabus': {
+          'fileName': name,
+          'storageUrl': downloadUrl,
+          'uploadedAt': now.toIso8601String(),
+          'status': 'ready'
+        },
+        'updatedAt': FieldValue.serverTimestamp()
+      }, SetOptions(merge: true));
+      try {
+        await emitLearningEvent(FirebaseFirestore.instance, widget.uid, 'syllabus_uploaded', source: 'syllabus', payload: {'fileName': name, 'fileType': file.extension, 'fileSize': size});
+      } catch (_) {}
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Syllabus saved — personalising ✓')));
+      }
+    } on FirebaseException catch (e) {
+      debugPrint('Syllabus upload FirebaseException: ${e.code} ${e.message}');
+      String msg = e.message ?? 'Upload failed';
+      if (e.code == 'permission-denied' || msg.contains('permission') || msg.contains('Missing or insufficient')) {
+        msg = 'We couldn\'t upload your syllabus. Please check your connection and try signing in again.';
+      } else if (e.code == 'unauthenticated') {
+        msg = 'Please sign in again to upload your syllabus.';
+      } else if (e.code == 'network-request-failed' || e.code == 'unavailable') {
+        msg = 'No internet connection. Please check your connection and try again.';
+      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: const Color(0xFFDC2626)));
+    } catch (e) {
+      debugPrint('Syllabus upload error: $e');
+      String msg = e.toString();
+      if (msg.contains('permission')) msg = 'We couldn\'t upload your syllabus. Please try signing in again.';
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg.contains('Exception:') ? msg.split('Exception:').last.trim() : msg)));
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ext = AquilaThemeExt.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-          gradient: const LinearGradient(
-              colors: [Color(0xFF0F172A), Color(0xFF1E293B)]),
+          gradient: const LinearGradient(colors: [Color(0xFF0F172A), Color(0xFF1E293B)]),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: ext.border)),
       child: Row(children: [
         Container(
             width: 32,
             height: 32,
-            decoration: BoxDecoration(
-                color: const Color(0x2410B981),
-                borderRadius: BorderRadius.circular(8)),
-            child: const Icon(Icons.description_outlined,
-                size: 16, color: Color(0xFF10B981))),
+            decoration: BoxDecoration(color: const Color(0x2410B981), borderRadius: BorderRadius.circular(8)),
+            child: const Icon(Icons.description_outlined, size: 16, color: Color(0xFF10B981))),
         const SizedBox(width: 10),
         Expanded(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(uid)
-                      .collection('syllabus')
-                      .orderBy('uploadedAt', descending: true)
-                      .limit(1)
-                      .snapshots(),
+                  stream: FirebaseFirestore.instance.collection('users').doc(widget.uid).collection('syllabus').orderBy('uploadedAt', descending: true).limit(1).snapshots(),
                   builder: (c, s) {
-                    final name = s.data?.docs.isNotEmpty == true
-                        ? (s.data!.docs.first.data()
-                                as Map<String, dynamic>)['fileName']
-                            ?.toString()
-                            .substring(0, 18)
-                        : null;
-                    return Text(name ?? 'Upload syllabus',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontFamily: AquilaColors.fontMain,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white));
+                    String? display;
+                    if (s.hasData && s.data!.docs.isNotEmpty) {
+                      final raw = (s.data!.docs.first.data() as Map<String, dynamic>)['fileName']?.toString();
+                      if (raw != null && raw.isNotEmpty) display = _safeFileName(raw);
+                    } else if (s.hasError) {
+                      display = 'Upload syllabus';
+                    }
+                    return Text(display ?? 'Upload syllabus',
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontFamily: AquilaColors.fontMain, fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white));
                   }),
-              Text('JPG, PNG, PDF',
-                  style: TextStyle(
-                      fontFamily: AquilaColors.fontMain,
-                      fontSize: 9,
-                      color: Colors.white.withOpacity(0.55))),
+              Text('JPG, PNG, PDF • Max 8MB',
+                  style: TextStyle(fontFamily: AquilaColors.fontMain, fontSize: 9, color: Colors.white.withValues(alpha: 0.55))),
             ])),
         const SizedBox(width: 8),
         ElevatedButton(
-            onPressed: () async {
-              final now = DateTime.now();
-              final fileName = 'syllabus_${now.millisecondsSinceEpoch}.pdf';
-              await FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(uid)
-                  .collection('syllabus')
-                  .add({
-                'fileName': fileName,
-                'fileType': 'application/pdf',
-                'fileSize': 120000,
-                'snippet': 'Mobile upload',
-                'uploadedAt': FieldValue.serverTimestamp(),
-                'status': 'ready',
-              });
-              await FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(uid)
-                  .collection('learning')
-                  .doc('profile')
-                  .set({
-                'syllabus': {
-                  'fileName': fileName,
-                  'uploadedAt': now.toIso8601String(),
-                  'status': 'ready'
-                },
-                'updatedAt': FieldValue.serverTimestamp()
-              }, SetOptions(merge: true));
-              try {
-                await emitLearningEvent(
-                  FirebaseFirestore.instance,
-                  uid,
-                  'syllabus_uploaded',
-                  source: 'syllabus',
-                  payload: {'fileName': fileName},
-                );
-              } catch (_) {}
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('Syllabus saved — personalising ✓')));
-              }
-            },
+            onPressed: _uploading ? null : _pickAndUpload,
             style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF10B981),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                minimumSize: Size.zero,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                minimumSize: const Size(60, 36),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-            child: const Text('Upload',
-                style: TextStyle(fontSize: 11, color: Colors.white))),
+            child: _uploading
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Upload', style: TextStyle(fontSize: 11, color: Colors.white))),
       ]),
     );
   }

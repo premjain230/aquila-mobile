@@ -33,8 +33,20 @@ class _AquilaAppState extends State<AquilaApp> {
   @override
   void initState() {
     super.initState();
+    ThemeStore.notifier.addListener(_onThemeChanged);
     _loadTheme();
     _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    ThemeStore.notifier.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (!mounted) return;
+    setState(() => _dark = ThemeStore.notifier.value);
   }
 
   Future<void> _loadTheme() async {
