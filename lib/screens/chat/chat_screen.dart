@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart' as fa;
 import 'package:flutter/material.dart';
 
 import '../../core/app_config.dart';
