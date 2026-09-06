@@ -122,9 +122,9 @@ class _MainShellState extends State<MainShell> {
               unselectedLabelStyle: const TextStyle(fontFamily: AquilaColors.fontMain),
               items: const [
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.today_outlined),
-                  activeIcon: Icon(Icons.today),
-                  label: 'Today',
+                  icon: Icon(Icons.home_outlined),
+                  activeIcon: Icon(Icons.home),
+                  label: 'Home',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.chat_bubble_outline),
@@ -193,8 +193,8 @@ class _MainShellState extends State<MainShell> {
           ),
           const Divider(),
           ListTile(
-            leading: const Icon(Icons.today_outlined),
-            title: const Text('Today'),
+            leading: const Icon(Icons.home_outlined),
+            title: const Text('Home'),
             selected: _index == 0,
             onTap: () {
               setState(() => _index = 0);

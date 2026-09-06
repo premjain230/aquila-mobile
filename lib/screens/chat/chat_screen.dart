@@ -133,14 +133,22 @@ class _ChatScreenState extends State<ChatScreen> {
     } on ApiException catch (e) {
       _failCount++;
       if (e.statusCode == 401) {
-        // Session is genuinely invalid even after a forced token refresh.
-        await AuthService.instance.signOut();
+        // Token expired — try to refresh once and let user retry, don't force signout
+        try { await fa.FirebaseAuth.instance.currentUser?.getIdToken(true); } catch (_) {}
         if (!mounted) return;
         showAquilaSnack(
           context,
-          'Your session expired. Please sign in again.',
+          'Session expired. Please try sending again.',
           error: true,
         );
+        if (mounted) {
+          setState(() {
+            _items.removeLast();
+            if (_items.isNotEmpty && _items.last.isUser) {
+              _items.add(_ChatItem.error('Session expired — tap retry. ($_failCount)'));
+            }
+          });
+        }
         return;
       }
       if (mounted) {
